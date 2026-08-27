@@ -2,6 +2,7 @@
 /**
  * kb — the intent graph over this repository.
  *
+ *   kb init                bootstrap the intent graph into this repository
  *   kb verify [--strict]   check every claim the docs make about the code
  *   kb why <target>        what a file, symbol, or entity is for
  *
@@ -13,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { findRepoRoot } from './root.js'
 import { loadConfig } from './config.js'
+import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type InitPlan } from './init.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
@@ -28,6 +30,64 @@ export function run(
   root?: string,
   changedFiles: ChangedFiles = gitChangedFiles,
 ): number {
+  const [command, ...rest] = argv
+  const palette = rest.includes('--no-colour') ? PLAIN : COLOUR
+  const positional = rest.find((a) => !a.startsWith('-'))
+
+  if (command === 'init') {
+    let kbRootArg: string | undefined
+    const kbRootIndex = rest.indexOf('--kb-root')
+    if (kbRootIndex !== -1 && rest[kbRootIndex + 1]) {
+      kbRootArg = rest[kbRootIndex + 1]
+    } else {
+      const kbRootFlag = rest.find((a) => a.startsWith('--kb-root='))
+      if (kbRootFlag) {
+        kbRootArg = kbRootFlag.slice('--kb-root='.length)
+      }
+    }
+    const dryRun = rest.includes('--dry-run')
+    const force = rest.includes('--force')
+
+    const initRoot = root ?? findGitRoot(process.cwd()) ?? process.cwd()
+    const probe = defaultFsProbe(initRoot)
+    const io = defaultInitIo(initRoot)
+
+    let plan: InitPlan
+    try {
+      plan = planInit(initRoot, { kbRoot: kbRootArg, dryRun, force }, probe)
+    } catch (e) {
+      err(`kb init: ${(e as Error).message}`)
+      return 1
+    }
+
+    if (dryRun) {
+      out(`kb init: dry run for ${initRoot}\n`)
+      for (const dir of plan.dirs) {
+        out(`  dir   ${dir}`)
+      }
+      for (const file of plan.files) {
+        out(`  file  ${file.path}`)
+      }
+      if (plan.gitignoreLine) {
+        out(`  git   .gitignore gains ${plan.gitignoreLine}`)
+      }
+      for (const note of plan.notes) {
+        out(`\n${note}`)
+      }
+      return 0
+    }
+
+    const written = applyInit(plan, io)
+    out(`kb init: initialized intent graph in ${initRoot}\n`)
+    for (const path of written) {
+      out(`  created ${path}`)
+    }
+    for (const note of plan.notes) {
+      out(`\n${note}`)
+    }
+    return 0
+  }
+
   const resolvedRoot = root ?? findRepoRoot(process.cwd())
   if (!resolvedRoot) {
     err('kb: not inside a repository. Run `kb init` at the root of your project first.')
@@ -42,10 +102,6 @@ export function run(
     return 2
   }
   const config = configResult.config
-
-  const [command, ...rest] = argv
-  const palette = rest.includes('--no-colour') ? PLAIN : COLOUR
-  const positional = rest.find((a) => !a.startsWith('-'))
 
   switch (command) {
     case 'ctx': {
