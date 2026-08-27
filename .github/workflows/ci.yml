@@ -30,6 +30,12 @@ jobs:
       - name: Run verification
         run: npm run verify
 
+      - name: Check architecture guards
+        run: npm run kb -- guards -- --check
+
+      - name: Check CODEOWNERS projection
+        run: npm run kb -- owners -- --check
+
       - name: Verify intent graph
         run: npm run kb -- verify -- --strict
 

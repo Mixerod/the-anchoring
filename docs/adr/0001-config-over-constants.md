@@ -2,6 +2,7 @@
 id: ADR-0001
 title: Configurable paths and thresholds with fixed schema
 status: accepted
+owner: "@Mixerod"
 governs:
   - file:src/config.ts
   - file:src/root.ts

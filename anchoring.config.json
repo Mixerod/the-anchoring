@@ -27,5 +27,53 @@
     "openDays": 30,
     "ceiling": 24
   },
-  "symbolIndex": "none"
+  "symbolIndex": "none",
+  "architecture": {
+    "layers": [
+      {
+        "name": "cli",
+        "paths": [
+          "src/cli.ts"
+        ]
+      },
+      {
+        "name": "app",
+        "paths": [
+          "src/render.ts",
+          "src/init.ts",
+          "src/agents.ts"
+        ]
+      },
+      {
+        "name": "domain",
+        "paths": [
+          "src/config.ts",
+          "src/config-architecture.ts",
+          "src/store.ts",
+          "src/verify.ts",
+          "src/why.ts",
+          "src/ctx.ts",
+          "src/done.ts",
+          "src/guards.ts",
+          "src/owners.ts",
+          "src/model.ts",
+          "src/frontmatter.ts",
+          "src/anchors.ts"
+        ],
+        "pure": true
+      },
+      {
+        "name": "infra",
+        "paths": [
+          "src/root.ts",
+          "src/git.ts",
+          "src/loader.ts",
+          "src/resolver.ts",
+          "src/session.ts"
+        ]
+      }
+    ],
+    "maxFileLines": 400,
+    "maxFunctionLines": 50
+  }
 }

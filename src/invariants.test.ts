@@ -55,7 +55,7 @@ describe('invariants enforcement (eslint)', { timeout: 20_000 }, () => {
 
     it('permits node:fs in allowed I/O boundary modules', async () => {
       const results = await eslint.lintText("import { readFileSync } from 'node:fs';\nexport const x = readFileSync;\n", {
-        filePath: 'src/store.ts',
+        filePath: 'src/loader.ts',
       })
       const error = results[0]?.messages.find((m) => m.ruleId === 'no-restricted-imports')
       expect(error).toBeUndefined()

@@ -5,7 +5,8 @@
  * out of the graph onto file paths.
  */
 
-import { loadStore, type Entity } from './store.js'
+import { type Entity } from './store.js'
+import { loadStore } from './loader.js'
 import type { AnchoringConfig } from './config.js'
 
 export const OWNERS_START_MARKER = '<!-- kb:owners:start -->'

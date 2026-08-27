@@ -11,7 +11,8 @@
  */
 
 import { LINK_FIELDS } from './model.js'
-import { loadStore, type Entity, type Store } from './store.js'
+import { type Entity, type Store } from './store.js'
+import { loadStore } from './loader.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { parseAnchor } from './anchors.js'
 import type { AnchoringConfig } from './config.js'

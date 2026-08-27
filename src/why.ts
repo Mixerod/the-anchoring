@@ -10,7 +10,8 @@
  */
 
 import { EDGE_PHRASE, LINK_FIELDS } from './model.js'
-import { loadStore, type Entity } from './store.js'
+import { type Entity } from './store.js'
+import { loadStore } from './loader.js'
 import { parseAnchor } from './anchors.js'
 import { resolveOwnerForPath } from './owners.js'
 import type { AnchoringConfig } from './config.js'

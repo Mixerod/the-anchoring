@@ -1,12 +1,13 @@
 /**
- * Frontmatter reading.
+ * Frontmatter parsing.
  *
  * Tier 1 of progressive disclosure: this is the ~50 tokens per document that let an
  * agent decide what to read without reading anything. Keep it cheap — no file body is
  * ever parsed here.
+ *
+ * Pure module: string -> Frontmatter. File reading is delegated to infra/loader.ts.
  */
 
-import { readFileSync } from 'node:fs'
 import { load } from 'js-yaml'
 
 const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
@@ -32,14 +33,6 @@ export function parseFrontmatter(text: string): ParseResult {
     return { ok: false, reason: 'frontmatter must be a YAML mapping' }
   }
   return { ok: true, data: parsed as Frontmatter }
-}
-
-export function readFrontmatter(path: string): ParseResult {
-  try {
-    return parseFrontmatter(readFileSync(path, 'utf8'))
-  } catch (error) {
-    return { ok: false, reason: `unreadable: ${(error as Error).message}` }
-  }
 }
 
 /** Frontmatter list fields accept a bare scalar or a list; normalise to strings. */

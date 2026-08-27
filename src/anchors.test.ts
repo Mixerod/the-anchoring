@@ -2,7 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createResolver, parseAnchor } from './anchors.js'
+import { parseAnchor } from './anchors.js'
+import { createResolver } from './resolver.js'
 import { defaultConfig } from './config.js'
 
 function scratch(): string {

@@ -2,6 +2,7 @@
 id: INV-CONFIG-THREADED
 title: Configuration is threaded as a parameter, never a module-level singleton
 status: active
+owner: "@Mixerod"
 enforced_by:
   - file:eslint.config.js
 holds_for:

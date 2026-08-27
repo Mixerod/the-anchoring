@@ -8,7 +8,7 @@
  * Pure module: no filesystem, no crypto, no clock, no process.
  */
 
-import type { AnchoringConfig, Architecture, Layer } from './config.js'
+import type { AnchoringConfig, Architecture } from './config.js'
 
 export interface GeneratedFile {
   readonly path: string        // repo-relative
@@ -148,17 +148,21 @@ ${rules.join(',\n')}
   return body
 }
 
+function globForPath(p: string): string {
+  return p.endsWith('/') ? `${p}**/*` : p
+}
+
 function generateGuardsMjs(arch: Architecture, hash: string): string {
   const header = generateHeader(hash)
   const allTargetPaths: string[] = []
 
   for (const layer of arch.layers) {
     for (const p of layer.paths) {
-      allTargetPaths.push(`${p}**/*`)
+      allTargetPaths.push(globForPath(p))
     }
   }
   for (const root of arch.moduleRoots) {
-    allTargetPaths.push(`${root}**/*`)
+    allTargetPaths.push(globForPath(root))
   }
 
   const targetFiles =
@@ -193,7 +197,7 @@ ${targetFiles}
     },
   }`)
 
-  // Block 1b: test exemption for max-lines-per-function
+  // Block 2: exempt tests from function length
   blocks.push(`  {
     files: ['**/*.test.*', '**/*.spec.*'],
     rules: {
@@ -201,10 +205,10 @@ ${targetFiles}
     },
   }`)
 
-  // Block 2: pure layer constraints
-  const pureLayer: Layer | undefined = arch.layers.find((l) => l.pure)
+  // Block 3: pure layer
+  const pureLayer = arch.layers.find((l) => l.pure)
   if (pureLayer) {
-    const pureTargetFiles = pureLayer.paths.map((p) => `      '${p}**/*',`).join('\n')
+    const purePaths = pureLayer.paths.map((p) => `      '${globForPath(p)}',`).join('\n')
     const importPaths = arch.impureImports
       .map(
         (mod) =>
@@ -220,7 +224,7 @@ ${targetFiles}
 
     blocks.push(`  {
     files: [
-${pureTargetFiles}
+${purePaths}
     ],
     rules: {
       'no-restricted-imports': [

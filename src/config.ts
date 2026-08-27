@@ -6,8 +6,6 @@
  * kinds, link fields, and edge semantics) is intentionally hardcoded in model.ts.
  */
 
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { ENTITY_KINDS, type EntityKind } from './model.js'
 import {
   type Layer,
@@ -382,33 +380,4 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
       ...(architecture !== undefined ? { architecture } : {}),
     },
   }
-}
-
-export function loadConfig(root: string): ConfigResult {
-  const configPath = join(root, 'anchoring.config.json')
-  if (!existsSync(configPath)) {
-    return { ok: true, config: defaultConfig(root) }
-  }
-
-  let text: string
-  try {
-    text = readFileSync(configPath, 'utf8')
-  } catch (err) {
-    return {
-      ok: false,
-      problems: [`anchoring.config.json: unreadable: ${(err as Error).message}`],
-    }
-  }
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch (err) {
-    return {
-      ok: false,
-      problems: [`anchoring.config.json: invalid JSON: ${(err as Error).message}`],
-    }
-  }
-
-  return parseConfig(root, parsed)
 }

@@ -6,7 +6,7 @@ import { applyInit, planInit, type FsProbe, type InitIo } from './init.js'
 import { run } from './cli.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
-import { loadConfig } from './config.js'
+import { loadConfig } from './root.js'
 
 function memFs(initial: Record<string, string> = {}) {
   const files = new Map<string, string>(Object.entries(initial))

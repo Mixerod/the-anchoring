@@ -4,16 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   defaultConfig,
-  loadConfig,
   parseConfig,
   DEFAULT_ENTRY_POINTS,
   DEFAULT_IMPURE_IMPORTS,
   DEFAULT_MAX_FILE_LINES,
   DEFAULT_MAX_FUNCTION_LINES,
 } from './config.js'
+import { loadConfig } from './root.js'
 import { kindOf } from './model.js'
-import { loadStore } from './store.js'
-import { createResolver } from './anchors.js'
+import { loadStore } from './loader.js'
+import { createResolver } from './resolver.js'
 import { run } from './cli.js'
 
 function makeTemp(prefix: string): string {

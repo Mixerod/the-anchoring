@@ -19,7 +19,6 @@ export {
 // Configuration
 export {
   parseConfig,
-  loadConfig,
   defaultConfig,
   DEFAULT_KB_ROOT,
   DEFAULT_KINDS,
@@ -66,21 +65,24 @@ export {
   type OwnersReport,
 } from './owners.js'
 
-// Repository root
-export { findRepoRoot } from './root.js'
+// Repository root & Config loading
+export { findRepoRoot, loadConfig } from './root.js'
 
-// Store
-export { loadStore, readEntity, type Entity, type Store } from './store.js'
+// Store & Loading
+export { parseEntity, buildStore, type Entity, type Store, type LoadProblem } from './store.js'
+export { loadStore, readEntity, listMarkdown, readFrontmatter } from './loader.js'
 
-// Anchors
+// Anchors & Resolving
 export {
-  createResolver,
   parseAnchor,
-  hasCodegraphIndex,
+  checkAnchors,
   type Anchor,
+  type AnchorResult,
   type AnchorResolution,
+  type Resolver,
   type SymbolProbe,
 } from './anchors.js'
+export { createResolver, hasCodegraphIndex, codegraphProbe } from './resolver.js'
 
 // Session
 export { rememberWork, recallWork } from './session.js'

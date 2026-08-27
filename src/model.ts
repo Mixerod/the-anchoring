@@ -9,8 +9,6 @@
  * See docs/THE_ANCHORING.md.
  */
 
-import type { AnchoringConfig } from './config.js'
-
 export const ENTITY_KINDS = ['ADR', 'INV', 'FLOW', 'WORK', 'INC', 'HAZ'] as const
 export type EntityKind = (typeof ENTITY_KINDS)[number]
 
@@ -92,6 +90,10 @@ export const EDGE_PHRASE: Readonly<Record<string, string>> = {
   touches: 'was touched by',
 }
 
-export function kindOf(config: AnchoringConfig, id: string): EntityKind | undefined {
-  return ENTITY_KINDS.find((k) => config.kinds[k].idPattern.test(id))
+export interface KindPatternLookup {
+  readonly kinds: Readonly<Record<EntityKind, { readonly idPattern: RegExp }>>
+}
+
+export function kindOf(lookup: KindPatternLookup, id: string): EntityKind | undefined {
+  return ENTITY_KINDS.find((k) => lookup.kinds[k].idPattern.test(id))
 }

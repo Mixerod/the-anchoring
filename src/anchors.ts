@@ -6,16 +6,11 @@
  *   file:src/verify.ts        verified against the filesystem
  *   sym:createResolver        verified against the codegraph index
  *
- * Line numbers are not an anchor form and never will be. They rot within one commit,
- * and a reference that silently becomes wrong is worse than no reference at all.
- * That rule is the reason this file exists: every anchor must be machine-checkable,
- * so the promise in docs/THE_ANCHORING.md is enforced rather than merely written down.
+ * Pure domain module: defines anchor types, parser, and checker.
+ * Filesystem and codegraph probes live in infra/resolver.ts.
  */
 
-import { existsSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
-import { join } from 'node:path'
-import type { AnchoringConfig } from './config.js'
+import type { Entity } from './store.js'
 
 /** Symbol names are passed to a child process; refuse anything that is not one. */
 const SYMBOL_RE = /^[A-Za-z_$][A-Za-z0-9_$.]*$/
@@ -43,86 +38,54 @@ export function parseAnchor(raw: string): Anchor | undefined {
   return undefined
 }
 
-export function hasCodegraphIndex(config: AnchoringConfig): boolean {
-  return existsSync(join(config.root, '.codegraph'))
-}
-
-/**
- * Asks codegraph whether a symbol exists. `undefined` means "could not tell" — which the
- * caller must report as unverifiable rather than quietly treating as either answer.
- *
- * Injected as an argument (rule 5, and INV-CORE-PURITY's reasoning applied one layer out)
- * so the resolver is testable without a live index.
- */
 export type SymbolProbe = (root: string, name: string) => boolean | undefined
-
-export const codegraphProbe: SymbolProbe = (root, name) => {
-  // `shell: true` is required on Windows, where `codegraph` is a .cmd shim. The name is
-  // validated against SYMBOL_RE before it ever reaches here, so nothing shell-significant
-  // can appear on the command line.
-  const run = spawnSync('codegraph', ['query', name, '--json', '--limit', '1', '-p', root], {
-    encoding: 'utf8',
-    shell: true,
-    timeout: 20_000,
-  })
-  if (run.error || run.status !== 0) return undefined
-
-  try {
-    const parsed: unknown = JSON.parse(run.stdout)
-    const rows = Array.isArray(parsed)
-      ? parsed
-      : ((parsed as { results?: unknown }).results ?? (parsed as { symbols?: unknown }).symbols)
-    return Array.isArray(rows) && rows.length > 0
-  } catch {
-    return undefined
-  }
-}
 
 export interface Resolver {
   readonly resolve: (raw: string) => AnchorResult
   readonly indexed: boolean
 }
 
-export function createResolver(config: AnchoringConfig, probe: SymbolProbe = codegraphProbe): Resolver {
-  const indexed = config.symbolIndex === 'codegraph' && hasCodegraphIndex(config)
-  const cache = new Map<string, AnchorResult>()
+export interface AnchorFinding {
+  readonly severity: 'error' | 'warn'
+  readonly where: string
+  readonly message: string
+  readonly hint?: string
+}
 
-  const resolve = (raw: string): AnchorResult => {
-    const cached = cache.get(raw)
-    if (cached) return cached
+export function checkAnchors(
+  entity: Entity,
+  resolver: Resolver,
+): { readonly findings: readonly AnchorFinding[]; readonly count: number } {
+  const findings: AnchorFinding[] = []
+  let count = 0
 
-    const result = ((): AnchorResult => {
-      const anchor = parseAnchor(raw)
-      if (!anchor) {
-        return { raw, status: 'malformed', detail: 'expected `file:<path>` or `sym:<name>`' }
+  for (const [field, values] of Object.entries(entity.links)) {
+    for (const raw of values) {
+      if (!raw.startsWith('file:') && !raw.startsWith('sym:')) continue
+      count++
+      const result = resolver.resolve(raw)
+      if (result.status === 'malformed') {
+        findings.push({
+          severity: 'error',
+          where: `${entity.id} · ${field}`,
+          message: `anchor \`${raw}\` is malformed: ${result.detail ?? 'syntax error'}`,
+        })
+      } else if (result.status === 'missing') {
+        findings.push({
+          severity: 'error',
+          where: `${entity.id} · ${field}`,
+          message: `anchor \`${raw}\` is missing (${result.detail ?? 'not found'})`,
+          hint: 'the code this anchor pointed at no longer exists — update or retire this claim',
+        })
+      } else if (result.status === 'unverifiable') {
+        findings.push({
+          severity: 'warn',
+          where: `${entity.id} · ${field}`,
+          message: `anchor \`${raw}\` cannot be verified (${result.detail ?? 'unverifiable'})`,
+        })
       }
-      if (anchor.form === 'file') {
-        return existsSync(join(config.root, anchor.value))
-          ? { raw, status: 'resolved' }
-          : { raw, status: 'missing', detail: 'no such file' }
-      }
-      if (config.symbolIndex === 'none') {
-        return {
-          raw,
-          status: 'unverifiable',
-          detail: 'symbol index disabled in anchoring.config.json',
-        }
-      }
-      if (!indexed) {
-        return { raw, status: 'unverifiable', detail: 'no .codegraph index — run `codegraph init`' }
-      }
-      const found = probe(config.root, anchor.value)
-      if (found === undefined) {
-        return { raw, status: 'unverifiable', detail: 'codegraph query failed' }
-      }
-      return found
-        ? { raw, status: 'resolved' }
-        : { raw, status: 'missing', detail: 'symbol not found in the index' }
-    })()
-
-    cache.set(raw, result)
-    return result
+    }
   }
 
-  return { resolve, indexed }
+  return { findings, count }
 }

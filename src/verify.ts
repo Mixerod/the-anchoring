@@ -12,8 +12,10 @@ import {
   LINK_FIELDS,
   kindOf,
 } from './model.js'
-import { loadStore, type Entity, type Store } from './store.js'
-import { createResolver, type Resolver } from './anchors.js'
+import { type Entity, type Store } from './store.js'
+import { loadStore } from './loader.js'
+import { type Resolver } from './anchors.js'
+import { createResolver } from './resolver.js'
 import type { AnchoringConfig } from './config.js'
 
 export type Severity = 'error' | 'warn'

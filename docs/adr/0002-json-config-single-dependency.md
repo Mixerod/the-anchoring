@@ -2,6 +2,7 @@
 id: ADR-0002
 title: JSON configuration format with zero extra runtime dependencies
 status: accepted
+owner: "@Mixerod"
 governs:
   - file:src/config.ts
 constrains: []

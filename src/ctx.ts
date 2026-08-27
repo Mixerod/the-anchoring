@@ -11,8 +11,9 @@
  */
 
 import { LINK_FIELDS } from './model.js'
-import { loadStore, type Entity, type Store } from './store.js'
-import { hasCodegraphIndex } from './anchors.js'
+import { type Entity, type Store } from './store.js'
+import { loadStore } from './loader.js'
+import { hasCodegraphIndex } from './resolver.js'
 import type { AnchoringConfig } from './config.js'
 
 export interface CtxSection {

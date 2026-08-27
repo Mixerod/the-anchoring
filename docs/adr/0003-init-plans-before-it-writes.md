@@ -2,6 +2,7 @@
 id: ADR-0003
 title: Split initialization planning from application in kb init
 status: accepted
+owner: "@Mixerod"
 governs:
   - file:src/init.ts
 constrains: []

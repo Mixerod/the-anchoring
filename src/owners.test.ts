@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { verify } from './verify.js'
 import { why } from './why.js'
-import { loadConfig } from './config.js'
+import { loadConfig } from './root.js'
 import { run } from './cli.js'
 import {
   resolveOwners,

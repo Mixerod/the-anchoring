@@ -13,8 +13,7 @@
 
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { findRepoRoot } from './root.js'
-import { loadConfig } from './config.js'
+import { findRepoRoot, loadConfig } from './root.js'
 import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type InitPlan } from './init.js'
 import { planGuards, checkGuards } from './guards.js'
 import { updateAgentsMd } from './agents.js'

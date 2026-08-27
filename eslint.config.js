@@ -1,11 +1,13 @@
 // @ts-check
 import js from '@eslint/js'
 import tseslint from 'typescript-eslint'
+import anchoringGuards from './anchoring.guards.mjs'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**'] },
+  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/*.cjs'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  ...anchoringGuards,
   {
     files: ['src/**/*.ts'],
     rules: {
@@ -26,11 +28,9 @@ export default tseslint.config(
     ignores: [
       'src/**/*.test.ts',
       'src/git.ts',
-      'src/anchors.ts',
-      'src/frontmatter.ts',
-      'src/store.ts',
+      'src/loader.ts',
+      'src/resolver.ts',
       'src/session.ts',
-      'src/config.ts',
       'src/init.ts',
       'src/root.ts',
     ],
