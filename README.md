@@ -93,3 +93,16 @@ npx kb verify [--strict]       # machine check every claim across the repository
 ## License
 
 [MIT](LICENSE)
+
+---
+
+## Downstream copy outside this repository
+
+Section 4 of `~/.claude/rules/personal/30-agent-discipline.md` on this machine ("Tools that
+other repositories install") was derived from this project's design: generate configuration
+rather than run a toolchain, never edit a file the host owns, split plan from apply, purity
+as the redaction mechanism, generated files carry a header and a hash.
+
+No anchor can reach across that boundary, so nothing checks the two against each other.
+**When the guards or upstream-loop design changes on a point of principle, review that file
+in the same sitting.** A matching note lives at the top of it.
