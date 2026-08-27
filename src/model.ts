@@ -65,7 +65,21 @@ export const SCALAR_FIELDS: Readonly<Record<EntityKind, readonly string[]>> = {
   ADR: ['governs_nothing', 'owner'],
   INV: ['owner'],
   FLOW: [],
-  WORK: ['owner'],
+  /**
+   * `executed_by` is a free string with no shape constraint, on purpose.
+   *
+   * The first adopter carried `owner:` on all 70 of its work items with values like
+   * `claude`, `agent`, `antigravity` — none of them a person, all of them rejected by the
+   * `@handle` / `team:<name>` check. The field never meant ownership in the CODEOWNERS
+   * sense: it recorded *which agent executed the work*. Two concepts wearing one name,
+   * found by a validator rather than by a reader.
+   *
+   * The fix is a second field, not a looser first one. `owner` still identifies a person
+   * or a team and still has a shape, because an ownership field that accepts anything
+   * identifies nobody. `executed_by` names a tool, and constraining it to a handle shape
+   * would repeat the same mistake in the other direction.
+   */
+  WORK: ['owner', 'executed_by'],
   INC: [
     'upstream',
     'upstream_verdict',

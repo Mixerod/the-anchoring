@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { verify, type Finding } from './verify.js'
 import { defaultConfig } from './config.js'
+import { loadConfig } from './root.js'
 
 interface Doc {
   readonly path: string
@@ -138,5 +139,56 @@ describe('verify', () => {
       where: 'docs/adr/0001-a.md',
       message: 'no YAML frontmatter block',
     })
+  })
+})
+
+describe('executed_by is a free string (T19)', () => {
+  test('a work item may name the agent that did the work, in any shape', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kb-executed-by-'))
+    writeFileSync(
+      join(root, 'anchoring.config.json'),
+      JSON.stringify({ kbRoot: '.anchor', kinds: { ADR: { dir: 'docs/adr' } } }),
+    )
+    mkdirSync(join(root, '.anchor', 'work'), { recursive: true })
+
+    for (const [id, value] of [
+      ['W-1', 'claude'],
+      ['W-2', 'agent'],
+      ['W-3', 'antigravity'],
+      ['W-4', 'unassigned'],
+    ]) {
+      writeFileSync(
+        join(root, '.anchor', 'work', `${id}.md`),
+        `---\nid: ${id}\ntitle: Some work\nstatus: done\nexecuted_by: ${value}\n---\n\nBody.\n`,
+      )
+    }
+
+    const conf = loadConfig(root)
+    expect(conf.ok).toBe(true)
+    if (!conf.ok) return
+
+    const report = verify(conf.config)
+    expect(report.findings).toEqual([])
+    expect(report.entityCount).toBe(4)
+  })
+
+  test('`owner` keeps its shape — the fix is a second field, not a looser first one', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kb-owner-still-shaped-'))
+    writeFileSync(
+      join(root, 'anchoring.config.json'),
+      JSON.stringify({ kbRoot: '.anchor', kinds: { ADR: { dir: 'docs/adr' } } }),
+    )
+    mkdirSync(join(root, '.anchor', 'work'), { recursive: true })
+    writeFileSync(
+      join(root, '.anchor', 'work', 'W-1.md'),
+      '---\nid: W-1\ntitle: Some work\nstatus: done\nowner: claude\nexecuted_by: claude\n---\n\nBody.\n',
+    )
+
+    const conf = loadConfig(root)
+    if (!conf.ok) throw new Error('config did not load')
+
+    const findings = verify(conf.config).findings
+    expect(findings.length).toBe(1)
+    expect(findings[0]?.where).toBe('W-1 · owner')
   })
 })
