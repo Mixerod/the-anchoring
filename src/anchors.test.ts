@@ -16,9 +16,9 @@ const conf = (root: string) => defaultConfig(root)
 
 describe('parseAnchor', () => {
   test('reads the two supported forms', () => {
-    expect(parseAnchor('file:packages/core/src/state.ts')).toEqual({
+    expect(parseAnchor('file:src/state.ts')).toEqual({
       form: 'file',
-      value: 'packages/core/src/state.ts',
+      value: 'src/state.ts',
     })
     expect(parseAnchor('sym:applyCommand')).toEqual({ form: 'sym', value: 'applyCommand' })
   })
@@ -31,11 +31,11 @@ describe('parseAnchor', () => {
   })
 
   test('rejects an unprefixed value, so a bare path can never be mistaken for an anchor', () => {
-    expect(parseAnchor('packages/core/src/state.ts')).toBeUndefined()
+    expect(parseAnchor('src/state.ts')).toBeUndefined()
   })
 
   test('rejects an unknown prefix', () => {
-    expect(parseAnchor('line:packages/core/src/state.ts:42')).toBeUndefined()
+    expect(parseAnchor('line:src/state.ts:42')).toBeUndefined()
   })
 
   test('rejects a symbol carrying shell metacharacters', () => {
@@ -67,7 +67,7 @@ describe('createResolver', () => {
   })
 
   test('reports a malformed anchor rather than silently ignoring it', () => {
-    const result = createResolver(conf(scratch())).resolve('packages/core/src/state.ts')
+    const result = createResolver(conf(scratch())).resolve('src/state.ts')
 
     expect(result.status).toBe('malformed')
   })

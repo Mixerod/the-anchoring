@@ -56,7 +56,7 @@ describe('renderVerify', () => {
     const text = renderVerify(
       report({
         indexed: false,
-        findings: [{ severity: 'warn', where: 'ADR-0003', message: 'sym:tempoCost unverifiable' }],
+        findings: [{ severity: 'warn', where: 'ADR-0003', message: 'sym:calculateCost unverifiable' }],
       }),
       PLAIN,
     )
@@ -105,13 +105,13 @@ describe('renderWhy', () => {
     const text = renderWhy(
       {
         ...base,
-        query: 'packages/core/src/tempo/costs.ts',
+        query: 'src/costs.ts',
         mentions: [
           {
             entity,
             field: 'governs',
             phrase: 'is governed by',
-            matched: 'file:packages/core/src/tempo/costs.ts',
+            matched: 'file:src/costs.ts',
           },
         ],
       },
@@ -175,14 +175,25 @@ describe('renderCtx', () => {
     expect(text).toContain('no incident')
   })
 
-  test('lists anchors, and points at codegraph for the next step', () => {
+  test('lists anchors, and points at codegraph when indexed', () => {
     const text = renderCtx(
-      { ...base, subject: entity, anchors: ['file:packages/core/src/tempo/costs.ts'] },
+      { ...base, subject: entity, anchors: ['file:src/costs.ts'], indexed: true },
       PLAIN,
     )
 
-    expect(text).toContain('file:packages/core/src/tempo/costs.ts')
+    expect(text).toContain('file:src/costs.ts')
     expect(text).toContain('codegraph explore')
+  })
+
+  test('prints only "Read only what applies." when not indexed', () => {
+    const text = renderCtx(
+      { ...base, subject: entity, anchors: ['file:src/costs.ts'], indexed: false },
+      PLAIN,
+    )
+
+    expect(text).toContain('file:src/costs.ts')
+    expect(text).toContain('Read only what applies.')
+    expect(text).not.toContain('codegraph explore')
   })
 
   test('says so when nothing is anchored yet', () => {

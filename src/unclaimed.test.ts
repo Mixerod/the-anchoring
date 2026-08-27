@@ -36,10 +36,10 @@ const adr = (name: string, body: string): Doc => ({ path: `docs/adr/${name}`, bo
 
 describe('unclaimedWork — the Stop hook stops being silent', () => {
   test('reports source files changed with no work item open', () => {
-    const report = unclaimedWork(conf(), () => ['apps/web/src/board.tsx', 'packages/core/src/x.ts'])
+    const report = unclaimedWork(conf(), () => ['apps/web/src/board.tsx', 'src/x.ts'])
 
     expect(report).not.toBeNull()
-    expect(report?.files).toEqual(['apps/web/src/board.tsx', 'packages/core/src/x.ts'])
+    expect(report?.files).toEqual(['apps/web/src/board.tsx', 'src/x.ts'])
   })
 
   test('names the files, so the message is actionable rather than a scold', () => {

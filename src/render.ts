@@ -141,10 +141,10 @@ export function renderCtx(report: CtxReport, c: Palette = COLOUR): string {
       ? `  ${c.dim}nothing anchored yet - add \`touches:\` as you learn what it reaches${c.off}`
       : report.anchors.map((a) => `  ${a}`).join('\n'),
   )
-  lines.push(
-    '',
-    `${c.dim}Read only what applies. Then: codegraph explore "<your question>".${c.off}`,
-  )
+  const trailingHint = report.indexed
+    ? 'Read only what applies. Then: codegraph explore "<your question>".'
+    : 'Read only what applies.'
+  lines.push('', `${c.dim}${trailingHint}${c.off}`)
   return lines.join('\n')
 }
 

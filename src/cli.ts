@@ -6,8 +6,7 @@
  *   kb why <target>        what a file, symbol, or entity is for
  *
  * This file only routes. Checking lives in verify.ts, the reverse walk in why.ts,
- * and every byte of output in render.ts. Rationale:
- * .agent/rules/15-retrieval.md and docs/adr/0013-knowledge-base-and-retrieval.md.
+ * and every byte of output in render.ts. Rationale: docs/THE_ANCHORING.md.
  */
 
 import { fileURLToPath } from 'node:url'

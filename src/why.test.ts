@@ -20,21 +20,21 @@ const conf = (root: string) => defaultConfig(root)
 const REPO = {
   'docs/adr/0003-tempo.md':
     '---\nid: ADR-0003\ntitle: Tempo Pool\nstatus: accepted\n' +
-    'governs:\n  - file:packages/core/src/tempo/costs.ts\n' +
+    'governs:\n  - file:src/tempo/costs.ts\n' +
     'constrains:\n  - INV-TEMPO-BITES\n' +
-    'verified_by:\n  - file:packages/core/src/tempo/tempo.test.ts\n---\n',
+    'verified_by:\n  - file:src/tempo/tempo.test.ts\n---\n',
   '.anchor/invariant/INV-TEMPO-BITES.md':
     '---\nid: INV-TEMPO-BITES\ntitle: Tempo must bite\nstatus: active\n' +
-    'holds_for:\n  - file:packages/core/src/tempo\n---\n',
+    'holds_for:\n  - file:src/tempo\n---\n',
   '.anchor/flow/FLOW-0001.md':
     '---\nid: FLOW-0001\ntitle: Player reads the cost of a move\nstatus: draft\n' +
-    'served_by:\n  - file:packages/core/src/tempo/costs.ts\n' +
+    'served_by:\n  - file:src/tempo/costs.ts\n' +
     'decided_by:\n  - ADR-0003\n---\n',
 } as const
 
 describe('why, on a code path', () => {
   test('names every entity that anchors to the file, and how', () => {
-    const report = why(conf(fixture(REPO)), 'packages/core/src/tempo/costs.ts')
+    const report = why(conf(fixture(REPO)), 'src/tempo/costs.ts')
 
     expect(report.mentions.map((m) => [m.entity.id, m.phrase])).toEqual([
       ['ADR-0003', 'is governed by'],
@@ -43,19 +43,19 @@ describe('why, on a code path', () => {
   })
 
   test('matches a directory anchor for a file beneath it', () => {
-    const report = why(conf(fixture(REPO)), 'packages/core/src/tempo')
+    const report = why(conf(fixture(REPO)), 'src/tempo')
 
     expect(report.mentions.map((m) => m.entity.id)).toContain('INV-TEMPO-BITES')
   })
 
   test('accepts a Windows-style path, because that is what a terminal will paste', () => {
-    const report = why(conf(fixture(REPO)), 'packages\\core\\src\\tempo\\costs.ts')
+    const report = why(conf(fixture(REPO)), 'src\\tempo\\costs.ts')
 
     expect(report.mentions.map((m) => m.entity.id)).toEqual(['ADR-0003', 'FLOW-0001'])
   })
 
   test('accepts a leading ./ without treating it as a different path', () => {
-    const report = why(conf(fixture(REPO)), './packages/core/src/tempo/costs.ts')
+    const report = why(conf(fixture(REPO)), './src/tempo/costs.ts')
 
     expect(report.mentions).toHaveLength(2)
   })
@@ -68,7 +68,7 @@ describe('why, on a code path', () => {
   })
 
   test('does not match a sibling directory that shares a name prefix', () => {
-    const report = why(conf(fixture(REPO)), 'packages/core/src/temp')
+    const report = why(conf(fixture(REPO)), 'src/temp')
 
     expect(report.mentions).toEqual([])
   })

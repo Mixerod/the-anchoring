@@ -20,21 +20,21 @@ const conf = (root: string) => defaultConfig(root)
 const REPO = {
   'docs/adr/0003-tempo.md':
     '---\nid: ADR-0003\ntitle: Tempo Pool\nstatus: accepted\n' +
-    'constrains:\n  - INV-TEMPO-BITES\ngoverns:\n  - file:packages/core/src/tempo\n---\n',
+    'constrains:\n  - INV-TEMPO-BITES\ngoverns:\n  - file:src/costs.ts\n---\n',
   '.anchor/invariant/INV-TEMPO-BITES.md':
     '---\nid: INV-TEMPO-BITES\ntitle: Tempo must bite\nstatus: active\n---\n',
   '.anchor/incident/INC-0007.md':
     '---\nid: INC-0007\ntitle: Replay desync\nstatus: fixed\n' +
-    'touches:\n  - file:packages/core/src/tempo/costs.ts\n---\n',
+    'touches:\n  - file:src/costs.ts\n---\n',
   '.anchor/work/W-112.md':
     '---\nid: W-112\ntitle: Tune knight leap cost\nstatus: doing\n' +
     'implements:\n  - ADR-0003\ncloses:\n  - INC-0007\n' +
-    'touches:\n  - file:packages/core/src/tempo/costs.ts\n' +
+    'touches:\n  - file:src/costs.ts\n' +
     'blocked_by:\n  - W-99\n---\n',
   '.anchor/work/W-99.md': '---\nid: W-99\ntitle: Replace the LCG\nstatus: todo\n---\n',
   '.anchor/work/W-100.md':
     '---\nid: W-100\ntitle: Earlier tempo work\nstatus: done\n' +
-    'touches:\n  - file:packages/core/src/tempo/costs.ts\n---\n',
+    'touches:\n  - file:src/costs.ts\n---\n',
 } as const
 
 const section = (root: string, id: string, heading: string) =>
@@ -70,7 +70,7 @@ describe('ctx', () => {
   })
 
   test('returns the anchors so the agent can hand them to codegraph', () => {
-    expect(ctx(conf(fixture(REPO)), 'W-112').anchors).toEqual(['file:packages/core/src/tempo/costs.ts'])
+    expect(ctx(conf(fixture(REPO)), 'W-112').anchors).toEqual(['file:src/costs.ts'])
   })
 
   test('gives every empty section a note, so silence never reads as "nothing applies"', () => {

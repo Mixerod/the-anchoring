@@ -27,7 +27,7 @@ const BROKEN = fixture({
 
 const UNINDEXED_SYMBOL = fixture({
   'docs/adr/0003-tempo.md':
-    '---\nid: ADR-0003\ntitle: Tempo Pool\nstatus: accepted\ngoverns:\n  - sym:tempoCost\n---\n',
+    '---\nid: ADR-0003\ntitle: Tempo Pool\nstatus: accepted\ngoverns:\n  - sym:calculateCost\n---\n',
 })
 
 function invoke(argv: readonly string[], root: string) {
@@ -95,10 +95,10 @@ describe('kb, no command', () => {
 })
 
 const WORK = fixture({
-  'packages/core/src/tempo/costs.ts': 'export const cost = 2\n',
+  'src/tempo/costs.ts': 'export const cost = 2\n',
   'docs/adr/0003-tempo.md':
     '---\nid: ADR-0003\ntitle: Tempo Pool\nstatus: accepted\n' +
-    'governs:\n  - file:packages/core/src/tempo\n---\n',
+    'governs:\n  - file:src/tempo\n---\n',
   '.anchor/work/W-112.md':
     '---\nid: W-112\ntitle: Tune knight leap cost\nstatus: doing\n' +
     'implements:\n  - ADR-0003\n---\n',

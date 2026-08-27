@@ -242,7 +242,7 @@ describe('holds_for is what makes a hazard reachable', () => {
   })
 
   test('fails a sym: anchor — it cannot be verified until codegraph is indexed', () => {
-    const root = fixture(code, hazard('HAZ-0001', 'resolution: open\n', { holdsFor: 'sym:tempoCost' }))
+    const root = fixture(code, hazard('HAZ-0001', 'resolution: open\n', { holdsFor: 'sym:calculateCost' }))
 
     expect(errors(root).some((f) => f.message.includes('file:'))).toBe(true)
   })

@@ -12,6 +12,7 @@
 
 import { LINK_FIELDS } from './model.js'
 import { loadStore, type Entity, type Store } from './store.js'
+import { hasCodegraphIndex } from './anchors.js'
 import type { AnchoringConfig } from './config.js'
 
 export interface CtxSection {
@@ -34,6 +35,7 @@ export interface CtxReport {
   readonly sections: readonly CtxSection[]
   readonly anchors: readonly string[]
   readonly workDir?: string
+  readonly indexed?: boolean
 }
 
 function refs(entity: Entity, field: string, store: Store): readonly Entity[] {
@@ -67,8 +69,17 @@ function neighbours(subject: Entity, store: Store): readonly CtxEntry[] {
 
 export function ctx(config: AnchoringConfig, query: string): CtxReport {
   const store = loadStore(config)
+  const indexed = config.symbolIndex === 'codegraph' && hasCodegraphIndex(config)
   const subject = store.byId.get(query)
-  if (!subject) return { query, sections: [], anchors: [], workDir: config.kinds.WORK.dir }
+  if (!subject) {
+    return {
+      query,
+      sections: [],
+      anchors: [],
+      workDir: config.kinds.WORK.dir,
+      indexed,
+    }
+  }
 
   const entry = (via: string) => (e: Entity): CtxEntry => ({
     id: e.id,
@@ -92,6 +103,7 @@ export function ctx(config: AnchoringConfig, query: string): CtxReport {
     subject,
     anchors: anchorsOf(subject),
     workDir: config.kinds.WORK.dir,
+    indexed,
     sections: [
       {
         heading: 'Decides this work',

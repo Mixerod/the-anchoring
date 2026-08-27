@@ -6,7 +6,7 @@
  * Everything here is declarative on purpose — validation, `kb why`, and the CI gate
  * are all driven by these tables, so adding a field is a one-line change.
  *
- * See docs/adr/0013-knowledge-base-and-retrieval.md and docs/adr/0015-hazards-external-failure-modes.md.
+ * See docs/THE_ANCHORING.md.
  */
 
 import type { AnchoringConfig } from './config.js'

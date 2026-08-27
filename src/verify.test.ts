@@ -116,7 +116,7 @@ describe('verify', () => {
 
   test('warns rather than fails on symbol anchors when the repo is not indexed', () => {
     const root = fixture(
-      adr('0001-a.md', '---\nid: ADR-0001\ntitle: A\nstatus: accepted\ngoverns:\n  - sym:tempoCost\n---\n'),
+      adr('0001-a.md', '---\nid: ADR-0001\ntitle: A\nstatus: accepted\ngoverns:\n  - sym:calculateCost\n---\n'),
     )
     const report = verify(conf(root))
 

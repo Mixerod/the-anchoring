@@ -3,13 +3,13 @@
  *
  * An anchor is a stable reference to code. Two forms, deliberately no third:
  *
- *   file:src/verify.ts   verified against the filesystem
- *   sym:tempoCost        verified against the codegraph index
+ *   file:src/verify.ts        verified against the filesystem
+ *   sym:createResolver        verified against the codegraph index
  *
  * Line numbers are not an anchor form and never will be. They rot within one commit,
  * and a reference that silently becomes wrong is worse than no reference at all.
  * That rule is the reason this file exists: every anchor must be machine-checkable,
- * so ADR-0013's promise is enforced rather than merely written down.
+ * so the promise in docs/THE_ANCHORING.md is enforced rather than merely written down.
  */
 
 import { existsSync } from 'node:fs'
