@@ -49,6 +49,14 @@ export default [
   {
     files: ['**/*.test.*', '**/*.spec.*'],
     rules: {
+      'max-lines': [
+        'error',
+        {
+          max: 400,
+          skipBlankLines: true,
+          skipComments: true,
+        },
+      ],
       'max-lines-per-function': 'off',
     },
   },
@@ -71,28 +79,6 @@ export default [
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-          {
-            name: 'node:fs',
-            message: 'domain is the pure layer: pass the value in as an argument instead of importing node:fs.',
-          },
-          {
-            name: 'node:child_process',
-            message: 'domain is the pure layer: pass the value in as an argument instead of importing node:child_process.',
-          },
-          {
-            name: 'node:http',
-            message: 'domain is the pure layer: pass the value in as an argument instead of importing node:http.',
-          },
-          {
-            name: 'node:https',
-            message: 'domain is the pure layer: pass the value in as an argument instead of importing node:https.',
-          },
-          {
-            name: 'node:crypto',
-            message: 'domain is the pure layer: pass the value in as an argument instead of importing node:crypto.',
-          },
-          ],
           patterns: [
           {
             group: ['node:fs', 'node:fs/*'],

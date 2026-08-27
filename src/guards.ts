@@ -197,10 +197,23 @@ ${targetFiles}
     },
   }`)
 
-  // Block 2: exempt tests from function length
+  // Block 2: test files.
+  //
+  // `layers[].paths` name source files, so without this block `max-lines` never sees a
+  // test file at all. The two ceilings are treated differently on purpose: a 900-line
+  // test file is a real problem and keeps the file limit, while a 200-line `describe`
+  // body is not, so the function limit stays off.
   blocks.push(`  {
     files: ['**/*.test.*', '**/*.spec.*'],
     rules: {
+      'max-lines': [
+        'error',
+        {
+          max: ${arch.maxFileLines},
+          skipBlankLines: true,
+          skipComments: true,
+        },
+      ],
       'max-lines-per-function': 'off',
     },
   }`)
@@ -209,12 +222,10 @@ ${targetFiles}
   const pureLayer = arch.layers.find((l) => l.pure)
   if (pureLayer) {
     const purePaths = pureLayer.paths.map((p) => `      '${globForPath(p)}',`).join('\n')
-    const importPaths = arch.impureImports
-      .map(
-        (mod) =>
-          `          {\n            name: '${mod}',\n            message: '${pureLayer.name} is the pure layer: pass the value in as an argument instead of importing ${mod}.',\n          },`,
-      )
-      .join('\n')
+    // `patterns` only, never `paths`. The group ['node:fs', 'node:fs/*'] already matches
+    // the bare specifier, so emitting both made a single violation report twice:
+    //   'node:fs' import is restricted from being used.
+    //   'node:fs' import is restricted from being used by a pattern.
     const importPatterns = arch.impureImports
       .map(
         (mod) =>
@@ -230,9 +241,6 @@ ${purePaths}
       'no-restricted-imports': [
         'error',
         {
-          paths: [
-${importPaths}
-          ],
           patterns: [
 ${importPatterns}
           ],

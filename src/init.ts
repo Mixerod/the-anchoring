@@ -8,7 +8,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseConfig, type Layer } from './config.js'
+import {
+  DEFAULT_ENTRY_POINTS,
+  DEFAULT_IMPURE_IMPORTS,
+  DEFAULT_MAX_FILE_LINES,
+  DEFAULT_MAX_FUNCTION_LINES,
+  parseConfig,
+  type Layer,
+} from './config.js'
 import { planGuards } from './guards.js'
 import { renderAgentsMd } from './agents.js'
 
@@ -141,15 +148,27 @@ export function planInit(root: string, options: InitOptions, probe: FsProbe): In
 
     const detectedModuleRoots = MODULE_ROOT_CANDIDATES.filter((m) => probe(m)).map((m) => `${m}/`)
 
+    // Every value is written out, never left to an implicit default. A generated config is
+    // documentation: a reader must be able to see what the ceiling is without knowing
+    // which constants the tool falls back to, and must be able to change one by editing
+    // the line in front of them. docs/PLAN.md T4 step 6.
+    const explicitDefaults = {
+      entryPoints: DEFAULT_ENTRY_POINTS,
+      maxFileLines: DEFAULT_MAX_FILE_LINES,
+      maxFunctionLines: DEFAULT_MAX_FUNCTION_LINES,
+      impureImports: DEFAULT_IMPURE_IMPORTS,
+    }
+
     if (detectedLayers.length === 0 && detectedModuleRoots.length === 0) {
-      configObj['architecture'] = { layers: [] }
+      configObj['architecture'] = { layers: [], moduleRoots: [], ...explicitDefaults }
       notes.push(
         'no conventional architecture directories detected; wrote "architecture": { "layers": [] } — fill in your layers in anchoring.config.json',
       )
     } else {
       configObj['architecture'] = {
         layers: detectedLayers,
-        ...(detectedModuleRoots.length > 0 ? { moduleRoots: detectedModuleRoots } : {}),
+        moduleRoots: detectedModuleRoots,
+        ...explicitDefaults,
       }
 
       const allLayerPaths = detectedLayers.flatMap((l) => l.paths)

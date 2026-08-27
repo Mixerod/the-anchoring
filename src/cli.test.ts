@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { run } from './cli.js'
+import { parseChangedFiles } from './git.js'
 
 function fixture(docs: Readonly<Record<string, string>>): string {
   const root = mkdtempSync(join(tmpdir(), 'kb-cli-'))
@@ -144,5 +145,39 @@ describe('kb done', () => {
 
     expect(result.code).toBe(0)
     expect(result.out).toContain('not closed yet')
+  })
+})
+
+describe('parseChangedFiles (T13d)', () => {
+  test('staged output only', () => {
+    expect(parseChangedFiles('src/a.ts\nsrc/b.ts\n', '')).toEqual(['src/a.ts', 'src/b.ts'])
+  })
+
+  test('untracked output only', () => {
+    expect(parseChangedFiles('', 'docs/new.md\n')).toEqual(['docs/new.md'])
+  })
+
+  test('both are merged', () => {
+    expect(parseChangedFiles('src/a.ts\n', 'src/z.ts\n')).toEqual(['src/a.ts', 'src/z.ts'])
+  })
+
+  test('a file reported by both appears once', () => {
+    expect(parseChangedFiles('src/a.ts\n', 'src/a.ts\n')).toEqual(['src/a.ts'])
+  })
+
+  test('blank and whitespace-only lines are dropped', () => {
+    expect(parseChangedFiles('src/a.ts\n\n   \n', '\n')).toEqual(['src/a.ts'])
+  })
+
+  test('the result is sorted, whatever order git printed', () => {
+    expect(parseChangedFiles('src/z.ts\nsrc/a.ts\n', 'src/m.ts\n')).toEqual([
+      'src/a.ts',
+      'src/m.ts',
+      'src/z.ts',
+    ])
+  })
+
+  test('two empty outputs are an empty list, not a list with one empty string', () => {
+    expect(parseChangedFiles('', '')).toEqual([])
   })
 })

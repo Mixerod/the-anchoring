@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest'
+// ESLint is imported here, and only here, on purpose: an invariant that is only
+// *generated* is a claim, and this file is where the claim gets run. `the-anchoring`
+// never runs a checker — a test that does is what makes "the generated rule fires"
+// machine-checkable. See docs/PLAN-LAYER3.md §3.
 import { ESLint } from 'eslint'
 
 describe('invariants enforcement (eslint)', { timeout: 20_000 }, () => {

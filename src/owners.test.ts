@@ -12,7 +12,10 @@ import {
   renderCodeowners,
   OWNERS_START_MARKER,
   OWNERS_END_MARKER,
+  LEGACY_OWNERS_START_MARKER,
+  LEGACY_OWNERS_END_MARKER,
 } from './owners.js'
+import { ARCHITECTURE_START_MARKER, ARCHITECTURE_END_MARKER, renderAgentsMd } from './agents.js'
 import type { Entity } from './store.js'
 
 function makeTemp(prefix: string): string {
@@ -266,5 +269,77 @@ describe('kb owners CLI', () => {
     const res = invokeCli(['owners', '--check'], root)
     expect(res.code).toBe(0)
     expect(res.out).toContain('CODEOWNERS: ok (no owners declared)')
+  })
+})
+
+describe('CODEOWNERS marker syntax (T13a)', () => {
+  test('a generated CODEOWNERS contains no HTML comment', () => {
+    const rendered = renderCodeowners([{ path: 'src/index.ts', owner: '@Mixerod', via: 'ADR-0001' }])
+    expect(rendered).not.toContain('<!--')
+    expect(rendered).toContain('# kb:owners:start')
+    expect(rendered).toContain('# kb:owners:end')
+  })
+
+  test('hand-written lines outside the markers survive a regeneration', () => {
+    const first = renderCodeowners([{ path: 'src/a.ts', owner: '@alice', via: 'ADR-0001' }])
+    const withHandEdits = `${first}\n# hand-written, not ours\ndocs/ @docs-team\n`
+    const second = renderCodeowners(
+      [{ path: 'src/b.ts', owner: '@bob', via: 'ADR-0002' }],
+      withHandEdits,
+    )
+
+    expect(second).toContain('# hand-written, not ours')
+    expect(second).toContain('docs/ @docs-team')
+    expect(second).toContain('src/b.ts')
+    expect(second).not.toContain('src/a.ts')
+  })
+
+  test('a file with the old HTML markers is migrated exactly once', () => {
+    const legacy = `# CODEOWNERS\n# keep me\n\n${LEGACY_OWNERS_START_MARKER}\nsrc/old.ts                     @old\n${LEGACY_OWNERS_END_MARKER}\n\n# footer\n`
+    const mappings = [{ path: 'src/new.ts', owner: '@new', via: 'ADR-0001' }]
+
+    const migrated = renderCodeowners(mappings, legacy)
+    expect(migrated).not.toContain('<!--')
+    expect(migrated).not.toContain('src/old.ts')
+    expect(migrated).toContain('# keep me')
+    expect(migrated).toContain('# footer')
+    expect(migrated).toContain(OWNERS_START_MARKER)
+
+    // Idempotent: feeding the migrated file back yields the identical file, and the
+    // legacy pair is gone, so no second migration can happen.
+    const again = renderCodeowners(mappings, migrated)
+    expect(again).toBe(migrated)
+    expect(again.split(OWNERS_START_MARKER).length - 1).toBe(1)
+  })
+
+  test('AGENTS.md still uses the HTML pair', () => {
+    expect(ARCHITECTURE_START_MARKER).toBe('<!-- kb:architecture:start -->')
+    expect(ARCHITECTURE_END_MARKER).toBe('<!-- kb:architecture:end -->')
+
+    const template = `# AGENTS.md\n\n${ARCHITECTURE_START_MARKER}\nold\n${ARCHITECTURE_END_MARKER}\n`
+    const rendered = renderAgentsMd(template, { layers: [{ name: 'core', paths: ['src/'], pure: true }] })
+    expect(rendered).toContain('<!-- kb:architecture:start -->')
+  })
+
+  test('a legacy CODEOWNERS on disk reports `stale`, then migrates and reports `ok`', () => {
+    const root = makeTemp('kb-owners-migrate-')
+    writeFileSync(join(root, 'anchoring.config.json'), JSON.stringify({ kinds: { ADR: { dir: 'docs/adr' } } }))
+    mkdirSync(join(root, 'docs', 'adr'), { recursive: true })
+    writeFileSync(
+      join(root, 'docs', 'adr', 'ADR-0001.md'),
+      '---\nid: ADR-0001\ntitle: First\nstatus: accepted\nowner: "@Mixerod"\ngoverns:\n  - file:src/index.ts\n---\nBody\n',
+    )
+    writeFileSync(
+      join(root, 'CODEOWNERS'),
+      `# CODEOWNERS\n\n${LEGACY_OWNERS_START_MARKER}\nsrc/index.ts                   @Mixerod\n${LEGACY_OWNERS_END_MARKER}\n`,
+    )
+
+    expect(invokeCli(['owners', '--check'], root).code).toBe(1)
+    expect(invokeCli(['owners'], root).code).toBe(0)
+
+    const migrated = readFileSync(join(root, 'CODEOWNERS'), 'utf8')
+    expect(migrated).not.toContain('<!--')
+
+    expect(invokeCli(['owners', '--check'], root).code).toBe(0)
   })
 })

@@ -1,2 +1,3 @@
 #!/bin/sh
 npm run kb -- verify
+npm run kb -- guards -- --check

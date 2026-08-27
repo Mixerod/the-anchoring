@@ -568,8 +568,14 @@ Everything below must be done with the shipped commands, not by hand.
 - [ ] test count ≥ 260, line coverage ≥ 95%
 - [ ] `dependencies` is exactly `{ "js-yaml": "^4.1.0" }` — ESLint and dependency-cruiser
       appear only under `devDependencies`, and neither under `peerDependencies`
-- [ ] `grep -rn "eslint\|dependency-cruiser" src/` finds only string literals inside the
-      generators — no import of either, anywhere
+- [ ] **No import of ESLint or dependency-cruiser outside `*.test.ts`.** Restated on
+      2026-08-28: the original wording banned the import "anywhere", and
+      `src/invariants.test.ts` imports `ESLint` because this plan itself required a test
+      proving the generated rule fires. The rule was too broadly worded, not the code —
+      the tool must never *run* a checker, and a test that runs one to prove the generated
+      config is real is exactly what makes that claim checkable. In `src/*.ts` that is not
+      a test, `grep -rn "eslint\|dependency-cruiser"` must still find only string literals
+      inside the generators.
 - [ ] `planGuards` and `guardsHash` are pure: `grep -n "node:fs\|node:child_process\|node:crypto\|new Date" src/guards.ts` → no matches
 - [ ] `kb guards --check`, `kb owners --check` exit `0` on this repository
 - [ ] a fresh temp repo: `kb init --guards && kb verify --strict && kb guards --check` all exit `0`

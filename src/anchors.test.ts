@@ -2,7 +2,13 @@ import { describe, expect, test } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { parseAnchor } from './anchors.js'
+import {
+  checkAnchors,
+  parseAnchor,
+  parseProbeOutput,
+  type AnchorStatus,
+  type Resolver,
+} from './anchors.js'
 import { createResolver } from './resolver.js'
 import { defaultConfig } from './config.js'
 
@@ -127,5 +133,90 @@ describe('createResolver, with an index present', () => {
     }).resolve('sym:Ruleset.tempoPerSquare')
 
     expect(seen).toEqual([[root, 'Ruleset.tempoPerSquare']])
+  })
+})
+
+describe('parseProbeOutput (T13d)', () => {
+  test('a bare array payload with rows means found', () => {
+    expect(parseProbeOutput('[{"name":"x"}]')).toBe(true)
+  })
+
+  test('a {results:[]} payload means not found, not "cannot tell"', () => {
+    expect(parseProbeOutput('{"results":[]}')).toBe(false)
+    expect(parseProbeOutput('{"results":[{"name":"x"}]}')).toBe(true)
+  })
+
+  test('a {symbols:[…]} payload is read the same way', () => {
+    expect(parseProbeOutput('{"symbols":[{"name":"x"}]}')).toBe(true)
+    expect(parseProbeOutput('{"symbols":[]}')).toBe(false)
+  })
+
+  test('empty output cannot be told apart from a failure, so it is undefined', () => {
+    expect(parseProbeOutput('')).toBeUndefined()
+  })
+
+  test('malformed JSON is undefined, never false', () => {
+    // The distinction matters: `false` becomes `missing` (an error), `undefined` becomes
+    // `unverifiable` (a warning). A parse failure must never be read as "the symbol is gone".
+    expect(parseProbeOutput('{not json')).toBeUndefined()
+    expect(parseProbeOutput('codegraph: command not found')).toBeUndefined()
+  })
+
+  test('a JSON payload of an unexpected shape is not found', () => {
+    expect(parseProbeOutput('{"total":3}')).toBe(false)
+    // A bare `null` is valid JSON but has no properties to read, so it lands in the
+    // catch and reports "cannot tell" rather than "not found".
+    expect(parseProbeOutput('null')).toBeUndefined()
+  })
+})
+
+describe('checkAnchors over a stub resolver', () => {
+  const entity = {
+    id: 'ADR-0001',
+    kind: 'ADR' as const,
+    title: 'T',
+    status: 'accepted',
+    path: 'docs/adr/ADR-0001.md',
+    fields: {},
+    links: {
+      governs: ['file:src/present.ts', 'file:src/gone.ts', 'sym:unindexed', 'file:'],
+      constrains: ['INV-X'],
+    },
+  }
+
+  const stub = (statuses: Readonly<Record<string, AnchorStatus>>): Resolver => ({
+    indexed: false,
+    resolve: (raw) => ({ raw, status: statuses[raw] ?? 'resolved' }),
+  })
+
+  test('counts every anchor and ignores entity references', () => {
+    const { count } = checkAnchors(entity, stub({}))
+    // Four values carry an anchor prefix, including the empty `file:`; `INV-X` does not
+    // and is never counted — counting is by prefix, and validity is the resolver's job.
+    expect(count).toBe(4)
+  })
+
+  test('a missing anchor is an error carrying the update hint', () => {
+    const { findings } = checkAnchors(entity, stub({ 'file:src/gone.ts': 'missing' }))
+    expect(findings.length).toBe(1)
+    expect(findings[0]?.severity).toBe('error')
+    expect(findings[0]?.where).toBe('ADR-0001 · governs')
+    expect(findings[0]?.hint).toContain('no longer exists')
+  })
+
+  test('an unverifiable anchor warns rather than errors', () => {
+    const { findings } = checkAnchors(entity, stub({ 'sym:unindexed': 'unverifiable' }))
+    expect(findings.map((f) => f.severity)).toEqual(['warn'])
+  })
+
+  test('a malformed anchor is an error with no hint', () => {
+    const { findings } = checkAnchors(entity, stub({ 'file:src/present.ts': 'malformed' }))
+    expect(findings[0]?.severity).toBe('error')
+    expect(findings[0]?.message).toContain('is malformed')
+    expect(findings[0]?.hint).toBeUndefined()
+  })
+
+  test('every anchor resolving produces no findings', () => {
+    expect(checkAnchors(entity, stub({})).findings).toEqual([])
   })
 })

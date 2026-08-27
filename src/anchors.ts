@@ -40,6 +40,29 @@ export function parseAnchor(raw: string): Anchor | undefined {
 
 export type SymbolProbe = (root: string, name: string) => boolean | undefined
 
+/**
+ * The pure half of the codegraph probe: everything except the spawn.
+ *
+ * `codegraph query --json` has three shapes in the wild — a bare array, `{results:[…]}`,
+ * and `{symbols:[…]}` — and any of them may be empty. `undefined` means *could not tell*,
+ * which the resolver reports as `unverifiable` rather than `missing`; a parse failure must
+ * never be read as "the symbol is gone".
+ *
+ * Extracted so the decision is testable without a child process, which is the same
+ * treatment every other I/O boundary in this codebase already gets.
+ */
+export function parseProbeOutput(stdout: string): boolean | undefined {
+  try {
+    const parsed: unknown = JSON.parse(stdout)
+    const rows = Array.isArray(parsed)
+      ? parsed
+      : ((parsed as { results?: unknown }).results ?? (parsed as { symbols?: unknown }).symbols)
+    return Array.isArray(rows) && rows.length > 0
+  } catch {
+    return undefined
+  }
+}
+
 export interface Resolver {
   readonly resolve: (raw: string) => AnchorResult
   readonly indexed: boolean

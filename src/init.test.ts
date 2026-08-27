@@ -189,7 +189,7 @@ describe('init --guards', () => {
     const plan = planInit('/repo', { guards: true }, probe)
     const conf = JSON.parse(plan.files.find((f) => f.path === 'anchoring.config.json')!.body)
 
-    expect(conf.architecture).toEqual({ layers: [] })
+    expect(conf.architecture.layers).toEqual([])
     expect(plan.notes.some((n) => n.includes('no conventional architecture directories detected'))).toBe(true)
     const invFiles = plan.files.filter((f) => f.path.startsWith('.anchor/invariant/INV-'))
     expect(invFiles.length).toBe(0)
@@ -306,5 +306,45 @@ describe('init integration and verification', () => {
     } finally {
       rmSync(scratch, { recursive: true, force: true })
     }
+  })
+})
+
+describe('init --guards writes a complete architecture block (T13f)', () => {
+  const ARCHITECTURE_KEYS = [
+    'layers',
+    'moduleRoots',
+    'entryPoints',
+    'maxFileLines',
+    'maxFunctionLines',
+    'impureImports',
+  ] as const
+
+  test('all six keys are written explicitly, never left to an implicit default', () => {
+    const { dirs, probe } = memFs({ 'package.json': '{}' })
+    dirs.add('src/domain')
+    dirs.add('src/infra')
+    dirs.add('packages')
+
+    const plan = planInit('/repo', { guards: true }, probe)
+    const conf = JSON.parse(plan.files.find((f) => f.path === 'anchoring.config.json')!.body)
+
+    for (const key of ARCHITECTURE_KEYS) {
+      expect(Object.keys(conf.architecture), `missing \`${key}\``).toContain(key)
+    }
+    expect(conf.architecture.entryPoints.length).toBeGreaterThan(0)
+    expect(conf.architecture.impureImports).toContain('node:fs')
+    expect(typeof conf.architecture.maxFileLines).toBe('number')
+    expect(typeof conf.architecture.maxFunctionLines).toBe('number')
+  })
+
+  test('the same six keys are written even when nothing is detected', () => {
+    const { probe } = memFs({ 'package.json': '{}' })
+    const plan = planInit('/repo', { guards: true }, probe)
+    const conf = JSON.parse(plan.files.find((f) => f.path === 'anchoring.config.json')!.body)
+
+    for (const key of ARCHITECTURE_KEYS) {
+      expect(Object.keys(conf.architecture), `missing \`${key}\``).toContain(key)
+    }
+    expect(conf.architecture.layers).toEqual([])
   })
 })

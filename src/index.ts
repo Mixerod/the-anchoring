@@ -48,8 +48,8 @@ export {
   generateArchitectureSection,
   renderAgentsMd,
   updateAgentsMd,
-  ARCH_START_MARKER,
-  ARCH_END_MARKER,
+  ARCHITECTURE_START_MARKER,
+  ARCHITECTURE_END_MARKER,
   type UpdateAgentsResult,
 } from './agents.js'
 

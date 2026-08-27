@@ -12,8 +12,8 @@ import {
   type Architecture,
 } from './config.js'
 
-export const ARCH_START_MARKER = '<!-- kb:architecture:start -->'
-export const ARCH_END_MARKER = '<!-- kb:architecture:end -->'
+export const ARCHITECTURE_START_MARKER = '<!-- kb:architecture:start -->'
+export const ARCHITECTURE_END_MARKER = '<!-- kb:architecture:end -->'
 
 export function generateArchitectureSection(
   arch?: Partial<Architecture> | Architecture,
@@ -78,11 +78,11 @@ export function renderAgentsMd(
   arch?: Partial<Architecture> | Architecture,
 ): string {
   const archSection = generateArchitectureSection(arch)
-  const replacement = `${ARCH_START_MARKER}\n${archSection}\n${ARCH_END_MARKER}`
+  const replacement = `${ARCHITECTURE_START_MARKER}\n${archSection}\n${ARCHITECTURE_END_MARKER}`
 
-  if (template.includes(ARCH_START_MARKER) && template.includes(ARCH_END_MARKER)) {
-    const startIdx = template.indexOf(ARCH_START_MARKER)
-    const endIdx = template.indexOf(ARCH_END_MARKER) + ARCH_END_MARKER.length
+  if (template.includes(ARCHITECTURE_START_MARKER) && template.includes(ARCHITECTURE_END_MARKER)) {
+    const startIdx = template.indexOf(ARCHITECTURE_START_MARKER)
+    const endIdx = template.indexOf(ARCHITECTURE_END_MARKER) + ARCHITECTURE_END_MARKER.length
     return template.slice(0, startIdx) + replacement + template.slice(endIdx)
   }
 
@@ -100,8 +100,8 @@ export function updateAgentsMd(
   arch?: Partial<Architecture> | Architecture,
 ): UpdateAgentsResult {
   if (
-    !existingContent.includes(ARCH_START_MARKER) ||
-    !existingContent.includes(ARCH_END_MARKER)
+    !existingContent.includes(ARCHITECTURE_START_MARKER) ||
+    !existingContent.includes(ARCHITECTURE_END_MARKER)
   ) {
     return {
       content: existingContent,
@@ -110,11 +110,11 @@ export function updateAgentsMd(
     }
   }
 
-  const startIdx = existingContent.indexOf(ARCH_START_MARKER)
-  const endIdx = existingContent.indexOf(ARCH_END_MARKER) + ARCH_END_MARKER.length
+  const startIdx = existingContent.indexOf(ARCHITECTURE_START_MARKER)
+  const endIdx = existingContent.indexOf(ARCHITECTURE_END_MARKER) + ARCHITECTURE_END_MARKER.length
 
   const archSection = generateArchitectureSection(arch)
-  const replacement = `${ARCH_START_MARKER}\n${archSection}\n${ARCH_END_MARKER}`
+  const replacement = `${ARCHITECTURE_START_MARKER}\n${archSection}\n${ARCHITECTURE_END_MARKER}`
 
   const newContent =
     existingContent.slice(0, startIdx) + replacement + existingContent.slice(endIdx)

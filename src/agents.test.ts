@@ -6,8 +6,8 @@ import {
   generateArchitectureSection,
   renderAgentsMd,
   updateAgentsMd,
-  ARCH_START_MARKER,
-  ARCH_END_MARKER,
+  ARCHITECTURE_START_MARKER,
+  ARCHITECTURE_END_MARKER,
 } from './agents.js'
 import { planInit } from './init.js'
 import type { Architecture } from './config.js'
@@ -69,7 +69,7 @@ describe('agents architecture section generation', () => {
 })
 
 describe('renderAgentsMd and updateAgentsMd', () => {
-  const template = `# AGENTS.md\n\nTop\n\n${ARCH_START_MARKER}\nold arch\n${ARCH_END_MARKER}\n\nBottom\n`
+  const template = `# AGENTS.md\n\nTop\n\n${ARCHITECTURE_START_MARKER}\nold arch\n${ARCHITECTURE_END_MARKER}\n\nBottom\n`
 
   test('marker block is replaced in place with surrounding text preserved verbatim', () => {
     const res = updateAgentsMd(template, SAMPLE_ARCH)
@@ -123,7 +123,7 @@ describe('AGENTS.md file lifecycle in init and guards', () => {
     )
     writeFileSync(
       join(root, 'AGENTS.md'),
-      `# AGENTS.md\n\nCustom Header\n\n${ARCH_START_MARKER}\nold\n${ARCH_END_MARKER}\n\nCustom Footer\n`,
+      `# AGENTS.md\n\nCustom Header\n\n${ARCHITECTURE_START_MARKER}\nold\n${ARCHITECTURE_END_MARKER}\n\nCustom Footer\n`,
     )
 
     const out: string[] = []
@@ -146,7 +146,7 @@ describe('AGENTS.md file lifecycle in init and guards', () => {
     )
     writeFileSync(
       join(root, 'AGENTS.md'),
-      `# AGENTS.md\n\n${ARCH_START_MARKER}\nstale arch block\n${ARCH_END_MARKER}\n`,
+      `# AGENTS.md\n\n${ARCHITECTURE_START_MARKER}\nstale arch block\n${ARCHITECTURE_END_MARKER}\n`,
     )
 
     // Generate guards files so .mjs / .cjs are ok
@@ -155,7 +155,7 @@ describe('AGENTS.md file lifecycle in init and guards', () => {
     // Revert AGENTS.md to stale
     writeFileSync(
       join(root, 'AGENTS.md'),
-      `# AGENTS.md\n\n${ARCH_START_MARKER}\nstale arch block\n${ARCH_END_MARKER}\n`,
+      `# AGENTS.md\n\n${ARCHITECTURE_START_MARKER}\nstale arch block\n${ARCHITECTURE_END_MARKER}\n`,
     )
 
     const out: string[] = []

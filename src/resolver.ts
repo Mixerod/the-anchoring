@@ -8,13 +8,20 @@
 import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
-import { parseAnchor, type AnchorResult, type Resolver, type SymbolProbe } from './anchors.js'
+import {
+  parseAnchor,
+  parseProbeOutput,
+  type AnchorResult,
+  type Resolver,
+  type SymbolProbe,
+} from './anchors.js'
 import type { AnchoringConfig } from './config.js'
 
 export function hasCodegraphIndex(config: AnchoringConfig): boolean {
   return existsSync(join(config.root, '.codegraph'))
 }
 
+/* c8 ignore start -- spawn-and-delegate; the decision it delegates to is parseProbeOutput */
 export const codegraphProbe: SymbolProbe = (root, name) => {
   const run = spawnSync('codegraph', ['query', name, '--json', '--limit', '1', '-p', root], {
     encoding: 'utf8',
@@ -22,17 +29,9 @@ export const codegraphProbe: SymbolProbe = (root, name) => {
     timeout: 20_000,
   })
   if (run.error || run.status !== 0) return undefined
-
-  try {
-    const parsed: unknown = JSON.parse(run.stdout)
-    const rows = Array.isArray(parsed)
-      ? parsed
-      : ((parsed as { results?: unknown }).results ?? (parsed as { symbols?: unknown }).symbols)
-    return Array.isArray(rows) && rows.length > 0
-  } catch {
-    return undefined
-  }
+  return parseProbeOutput(run.stdout)
 }
+/* c8 ignore stop */
 
 export function createResolver(
   config: AnchoringConfig,
