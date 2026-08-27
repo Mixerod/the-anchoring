@@ -112,7 +112,8 @@ export const USAGE =
   '  kb done <W-id>         what still needs recording, before you finish\n' +
   '  kb verify [--strict]   check every claim the docs make about the code\n' +
   '  kb guards [--check]    generate checkers from the architecture matrix\n' +
-  '  kb owners [--check]    project ownership into CODEOWNERS\n'
+  '  kb owners [--check]    project ownership into CODEOWNERS\n' +
+  '  kb upstream [--check]  project attributable incidents into reviewable reports\n'
 
 export function renderCtx(report: CtxReport, c: Palette = COLOUR): string {
   const { subject } = report
@@ -171,11 +172,17 @@ export function renderUnclaimed(
 export function renderDone(report: DoneReport, c: Palette = COLOUR): string {
   const label = report.work ? `${report.work.id} - ${report.work.title}` : report.workId
 
+  // Open upstream loops are surfaced here because this is where the agent already looks.
+  // One yellow line each, never an error and never a failed turn — the rule the Stop hook
+  // has followed since INC-0001.
+  const notices = report.upstreamNotices.map((n) => `${c.yellow}kb upstream: ${n}${c.off}`)
+
   if (report.gaps.length === 0) {
-    return (
+    return [
       `${c.green}kb done: ${label} is fully recorded${c.off} ` +
-      `${c.dim}(${report.changed.length} file(s) changed)${c.off}`
-    )
+        `${c.dim}(${report.changed.length} file(s) changed)${c.off}`,
+      ...notices,
+    ].join('\n')
   }
 
   const lines = [
@@ -187,5 +194,5 @@ export function renderDone(report: DoneReport, c: Palette = COLOUR): string {
     lines.push(`  ${c.bold}${gap.message}${c.off}`)
     lines.push(`    ${c.dim}-> ${gap.fix}${c.off}`)
   }
-  return lines.join('\n')
+  return [...lines, ...notices].join('\n')
 }

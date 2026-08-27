@@ -33,6 +33,10 @@ export default tseslint.config(
       'src/session.ts',
       'src/init.ts',
       'src/root.ts',
+      // The I/O half of `kb upstream`. Declared here for the same reason the five above
+      // are: it exists so `src/upstream.ts` can stay pure, and purity there is the
+      // redaction guarantee. See the module doc comment.
+      'src/cli-upstream.ts',
     ],
     rules: {
       'no-restricted-imports': [

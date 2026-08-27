@@ -15,6 +15,7 @@ import { type Entity, type Store } from './store.js'
 import { loadStore } from './loader.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { parseAnchor } from './anchors.js'
+import { openLoopNotices } from './upstream.js'
 import type { AnchoringConfig } from './config.js'
 
 export type GapKind = 'unlinked-decision' | 'unclaimed-code' | 'status' | 'open-incident'
@@ -36,6 +37,8 @@ export interface DoneReport {
   readonly workId: string
   readonly changed: readonly string[]
   readonly gaps: readonly Gap[]
+  /** Open upstream loops. Notes, never gaps: they must not fail the turn. */
+  readonly upstreamNotices: readonly string[]
 }
 
 /**
@@ -147,10 +150,13 @@ export function done(
   const work = store.byId.get(workId)
   const changed = changedFiles(config.root)
 
+  const upstreamNotices = openLoopNotices(store)
+
   if (!work || work.kind !== 'WORK') {
     return {
       workId,
       changed,
+      upstreamNotices,
       gaps: [
         {
           kind: 'status',
@@ -176,6 +182,7 @@ export function done(
     work,
     workId,
     changed,
+    upstreamNotices,
     gaps: [
       ...decisionGaps(work, changed, store),
       ...incidentGaps(changed, store),

@@ -25,6 +25,7 @@ import { done, unclaimedWork } from './done.js'
 import { COLOUR, PLAIN, USAGE, renderCtx, renderDone, renderUnclaimed, renderVerify, renderWhy } from './render.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
+import { runUpstream } from './cli-upstream.js'
 
 export function run(
   argv: readonly string[],
@@ -285,6 +286,9 @@ export function run(
       out(`\nkb owners: wrote ${report.targetFile}`)
       return 0
     }
+
+    case 'upstream':
+      return runUpstream(config, rest, out)
 
     default:
       err(USAGE)

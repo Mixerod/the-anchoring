@@ -150,5 +150,25 @@ export {
   type Palette,
 } from './render.js'
 
+// Upstream loop (Layer 3.1)
+export {
+  planUpstream,
+  upstreamHash,
+  listUpstream,
+  openLoopNotices,
+  UPSTREAM_BANNER,
+  // Named `checkUpstreamReports` here only to avoid colliding with `checkUpstream` from
+  // verify-upstream.js, which validates an incident rather than a generated file.
+  checkUpstream as checkUpstreamReports,
+  type PackageFacts,
+  type UpstreamReport,
+  type UpstreamPlan,
+  type UpstreamListRow,
+  type UpstreamFileState,
+  type ExistingReport,
+  type FileState,
+} from './upstream.js'
+export { runUpstream, readPackageFacts, readExistingReports } from './cli-upstream.js'
+
 // CLI runner
 export { run } from './cli.js'

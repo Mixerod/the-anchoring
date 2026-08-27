@@ -74,6 +74,38 @@ describe('invariants enforcement (eslint)', { timeout: 20_000 }, () => {
     })
   })
 
+  describe('INV-PURE-PLAN (purity is the redaction mechanism)', () => {
+    // Not a lint rule but a source grep, and deliberately so: the claim is about the whole
+    // file, not about one import statement, and it is the guarantee that a report cannot
+    // carry a source line, a diff, or a secret. A function that cannot read a file cannot
+    // leak one. See src/upstream.ts and docs/THE_ANCHORING.md, "The upstream loop".
+    const BANNED = ['node:fs', 'node:child_process', 'node:crypto', 'new Date']
+
+    /** Comment lines are dropped so a doc comment *naming* the ban does not trip it. */
+    const stripComments = (source: string): string =>
+      source
+        .split(/\r?\n/)
+        .filter((line) => {
+          const trimmed = line.trimStart()
+          return (
+            !trimmed.startsWith('*') && !trimmed.startsWith('//') && !trimmed.startsWith('/*')
+          )
+        })
+        .join('\n')
+
+    for (const file of ['src/upstream.ts', 'src/guards.ts']) {
+      it(`${file} performs no I/O and reads no clock`, async () => {
+        const { readFileSync } = await import('node:fs')
+        const source = readFileSync(file, 'utf8')
+        const code = stripComments(source)
+
+        for (const banned of BANNED) {
+          expect(code.includes(banned), `${file} mentions ${banned} outside a comment`).toBe(false)
+        }
+      })
+    }
+  })
+
   describe('public index exports', () => {
     it('exports all expected public APIs', async () => {
       const index = await import('./index.js')

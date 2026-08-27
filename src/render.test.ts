@@ -205,7 +205,7 @@ describe('renderDone', () => {
   const work = { ...entity, id: 'W-112', kind: 'WORK' as const, title: 'Tune knight leap cost' }
 
   test('confirms plainly when nothing is left to record', () => {
-    const text = renderDone({ work, workId: 'W-112', changed: ['a.ts'], gaps: [] }, PLAIN)
+    const text = renderDone({ work, workId: 'W-112', changed: ['a.ts'], gaps: [], upstreamNotices: [] }, PLAIN)
 
     expect(text).toContain('fully recorded')
     expect(text).toContain('1 file(s) changed')
@@ -217,6 +217,7 @@ describe('renderDone', () => {
         work,
         workId: 'W-112',
         changed: ['a.ts'],
+        upstreamNotices: [],
         gaps: [
           { kind: 'unlinked-decision', message: 'a.ts is governed by ADR-0008', fix: 'add implements' },
         ],
@@ -234,11 +235,40 @@ describe('renderDone', () => {
       {
         workId: 'W-404',
         changed: [],
+        upstreamNotices: [],
         gaps: [{ kind: 'status', message: 'no work item `W-404`', fix: 'create it' }],
       },
       PLAIN,
     )
 
     expect(text).toContain('W-404')
+  })
+})
+
+describe('renderDone surfaces open upstream loops', () => {
+  const work = { ...entity, id: 'W-112', kind: 'WORK' as const, title: 'Tune knight leap cost' }
+
+  test('appends one yellow line per open loop, even when nothing is left to record', () => {
+    const text = renderDone(
+      {
+        work,
+        workId: 'W-112',
+        changed: ['a.ts'],
+        gaps: [],
+        upstreamNotices: ['INC-0007 is escalated upstream with no work item opened'],
+      },
+      PLAIN,
+    )
+
+    expect(text).toContain('fully recorded')
+    expect(text).toContain('kb upstream: INC-0007 is escalated upstream with no work item opened')
+  })
+
+  test('says nothing when there is no open loop', () => {
+    const text = renderDone(
+      { work, workId: 'W-112', changed: [], gaps: [], upstreamNotices: [] },
+      PLAIN,
+    )
+    expect(text).not.toContain('kb upstream')
   })
 })
