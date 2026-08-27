@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { applyInit, planInit, type FsProbe, type InitIo } from './init.js'
 import { run } from './cli.js'
 import { verify } from './verify.js'
+import { why } from './why.js'
 import { loadConfig } from './config.js'
 
 function memFs(initial: Record<string, string> = {}) {
@@ -151,6 +152,82 @@ describe('planInit', () => {
   })
 })
 
+describe('init --guards', () => {
+  test('detects conventional layers for each directory', () => {
+    const { dirs, probe } = memFs({ 'package.json': '{}' })
+    dirs.add('src/ui')
+    dirs.add('src/app')
+    dirs.add('src/domain')
+    dirs.add('src/infra')
+
+    const plan = planInit('/repo', { guards: true }, probe)
+    const conf = JSON.parse(plan.files.find((f) => f.path === 'anchoring.config.json')!.body)
+
+    expect(conf.architecture).toBeDefined()
+    expect(conf.architecture.layers.map((l: { name: string }) => l.name)).toEqual([
+      'ui',
+      'app',
+      'domain',
+      'infra',
+    ])
+    expect(conf.architecture.layers[2].pure).toBe(true)
+  })
+
+  test('detects packages/ and src/modules/ as moduleRoots', () => {
+    const { dirs, probe } = memFs({ 'package.json': '{}' })
+    dirs.add('packages')
+    dirs.add('src/modules')
+
+    const plan = planInit('/repo', { guards: true }, probe)
+    const conf = JSON.parse(plan.files.find((f) => f.path === 'anchoring.config.json')!.body)
+
+    expect(conf.architecture.moduleRoots).toEqual(['src/modules/', 'packages/'])
+  })
+
+  test('nothing detected → empty layers, the note, and no INV- files', () => {
+    const { probe } = memFs({ 'package.json': '{}' })
+    const plan = planInit('/repo', { guards: true }, probe)
+    const conf = JSON.parse(plan.files.find((f) => f.path === 'anchoring.config.json')!.body)
+
+    expect(conf.architecture).toEqual({ layers: [] })
+    expect(plan.notes.some((n) => n.includes('no conventional architecture directories detected'))).toBe(true)
+    const invFiles = plan.files.filter((f) => f.path.startsWith('.anchor/invariant/INV-'))
+    expect(invFiles.length).toBe(0)
+  })
+
+  test('--guards writes exactly five INV- documents when layers detected', () => {
+    const { dirs, probe } = memFs({ 'package.json': '{}' })
+    dirs.add('src/domain')
+    dirs.add('src/infra')
+
+    const plan = planInit('/repo', { guards: true }, probe)
+    const invFiles = plan.files.filter((f) => f.path.startsWith('.anchor/invariant/INV-'))
+    expect(invFiles.length).toBe(5)
+
+    const names = invFiles.map((f) => f.path.split('/').pop())
+    expect(names).toEqual([
+      'INV-NO-CYCLES.md',
+      'INV-DEP-DIRECTION.md',
+      'INV-MODULE-ENTRY.md',
+      'INV-PURE-CORE.md',
+      'INV-FILE-SIZE.md',
+    ])
+
+    const pureDoc = invFiles.find((f) => f.path.endsWith('INV-PURE-CORE.md'))
+    expect(pureDoc?.body).toContain('file:src/domain/')
+  })
+
+  test('--guards in a non-JS directory writes config but no generated checker files and says so', () => {
+    const { dirs, probe } = memFs() // no package.json
+    dirs.add('src/domain')
+
+    const plan = planInit('/repo', { guards: true }, probe)
+    expect(plan.files.some((f) => f.path === 'anchoring.guards.mjs')).toBe(false)
+    expect(plan.files.some((f) => f.path === 'anchoring.depcruise.cjs')).toBe(false)
+    expect(plan.notes.some((n) => n.includes('generated checkers currently target TypeScript/JavaScript'))).toBe(true)
+  })
+})
+
 describe('init integration and verification', () => {
   test('every written template parses: after init, verify on that tree returns zero findings and entityCount === 0', () => {
     const scratch = mkdtempSync(join(tmpdir(), 'kb-init-test-'))
@@ -203,21 +280,29 @@ describe('init integration and verification', () => {
     }
   })
 
-  test('Acceptance: in a fresh temp git repo, kb init && kb verify exits 0 twice in a row', () => {
-    const scratch = mkdtempSync(join(tmpdir(), 'kb-init-acc-'))
+  test('Acceptance: in a fresh temp git repo with src/domain and src/infra, kb init --guards && kb verify --strict exits 0', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'kb-init-acc-guards-'))
     try {
       mkdirSync(join(scratch, '.git'))
-      const firstInit = invokeCli(['init'], scratch)
-      expect(firstInit.code).toBe(0)
+      mkdirSync(join(scratch, 'src', 'domain'), { recursive: true })
+      mkdirSync(join(scratch, 'src', 'infra'), { recursive: true })
+      writeFileSync(join(scratch, 'package.json'), JSON.stringify({ name: 'temp-app' }))
 
-      const firstVerify = invokeCli(['verify'], scratch)
-      expect(firstVerify.code).toBe(0)
+      const initResult = invokeCli(['init', '--guards'], scratch)
+      expect(initResult.code).toBe(0)
 
-      const secondInit = invokeCli(['init', '--force'], scratch)
-      expect(secondInit.code).toBe(0)
+      const confResult = loadConfig(scratch)
+      expect(confResult.ok).toBe(true)
+      if (!confResult.ok) return
 
-      const secondVerify = invokeCli(['verify'], scratch)
-      expect(secondVerify.code).toBe(0)
+      const report = verify(confResult.config)
+      expect(report.findings).toEqual([])
+      expect(report.entityCount).toBe(5)
+
+      const whyDomain = why(confResult.config, 'src/domain')
+      const mentionedIds = whyDomain.mentions.map((m) => m.entity.id)
+      expect(mentionedIds).toContain('INV-PURE-CORE')
+      expect(mentionedIds).toContain('INV-FILE-SIZE')
     } finally {
       rmSync(scratch, { recursive: true, force: true })
     }

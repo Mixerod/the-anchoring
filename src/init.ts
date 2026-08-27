@@ -8,11 +8,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseConfig, type Layer } from './config.js'
+import { planGuards } from './guards.js'
 
 export interface InitOptions {
   readonly kbRoot?: string | undefined
   readonly dryRun?: boolean | undefined
   readonly force?: boolean | undefined
+  readonly guards?: boolean | undefined
 }
 
 export type FsProbe = (relPath: string) => boolean
@@ -50,6 +53,15 @@ const GOVERNED_CANDIDATES = [
   'scripts',
 ] as const
 
+const CONVENTIONAL_LAYERS = [
+  { name: 'ui', paths: ['src/ui', 'apps'], pure: false },
+  { name: 'app', paths: ['src/app'], pure: false },
+  { name: 'domain', paths: ['src/domain', 'src/core', 'packages/core'], pure: true },
+  { name: 'infra', paths: ['src/infra'], pure: false },
+] as const
+
+const MODULE_ROOT_CANDIDATES = ['src/modules', 'packages'] as const
+
 export function findGitRoot(startDir: string): string | undefined {
   let current = startDir
   while (true) {
@@ -61,6 +73,11 @@ export function findGitRoot(startDir: string): string | undefined {
     current = parent
   }
   return undefined
+}
+
+function formatHoldsFor(paths: readonly string[]): string {
+  if (paths.length === 0) return 'holds_for: []'
+  return `holds_for:\n${paths.map((p) => `  - file:${p}`).join('\n')}`
 }
 
 export function planInit(root: string, options: InitOptions, probe: FsProbe): InitPlan {
@@ -88,7 +105,7 @@ export function planInit(root: string, options: InitOptions, probe: FsProbe): In
 
   const kbRoot = options.kbRoot ?? '.anchor'
 
-  const configObj = {
+  const configObj: Record<string, unknown> = {
     kbRoot,
     kinds: {
       ADR: { dir: adrDir },
@@ -106,6 +123,94 @@ export function planInit(root: string, options: InitOptions, probe: FsProbe): In
     symbolIndex,
   }
 
+  const files: { path: string; body: string }[] = []
+
+  if (options.guards) {
+    const detectedLayers: Layer[] = []
+    for (const spec of CONVENTIONAL_LAYERS) {
+      const foundPaths = spec.paths.filter((p) => probe(p)).map((p) => `${p}/`)
+      if (foundPaths.length > 0) {
+        detectedLayers.push({
+          name: spec.name,
+          paths: foundPaths,
+          pure: spec.pure,
+        })
+      }
+    }
+
+    const detectedModuleRoots = MODULE_ROOT_CANDIDATES.filter((m) => probe(m)).map((m) => `${m}/`)
+
+    if (detectedLayers.length === 0 && detectedModuleRoots.length === 0) {
+      configObj['architecture'] = { layers: [] }
+      notes.push(
+        'no conventional architecture directories detected; wrote "architecture": { "layers": [] } — fill in your layers in anchoring.config.json',
+      )
+    } else {
+      configObj['architecture'] = {
+        layers: detectedLayers,
+        ...(detectedModuleRoots.length > 0 ? { moduleRoots: detectedModuleRoots } : {}),
+      }
+
+      const allLayerPaths = detectedLayers.flatMap((l) => l.paths)
+      const pureLayer = detectedLayers.find((l) => l.pure)
+      const purePaths = pureLayer ? pureLayer.paths : []
+      const allPaths = [...allLayerPaths, ...detectedModuleRoots]
+
+      files.push(
+        {
+          path: `${kbRoot}/invariant/INV-NO-CYCLES.md`,
+          body: loadTemplate('invariants/INV-NO-CYCLES.md').replace(
+            'holds_for: []',
+            formatHoldsFor(allPaths),
+          ),
+        },
+        {
+          path: `${kbRoot}/invariant/INV-DEP-DIRECTION.md`,
+          body: loadTemplate('invariants/INV-DEP-DIRECTION.md').replace(
+            'holds_for: []',
+            formatHoldsFor(allLayerPaths),
+          ),
+        },
+        {
+          path: `${kbRoot}/invariant/INV-MODULE-ENTRY.md`,
+          body: loadTemplate('invariants/INV-MODULE-ENTRY.md').replace(
+            'holds_for: []',
+            formatHoldsFor(detectedModuleRoots.length > 0 ? detectedModuleRoots : allPaths),
+          ),
+        },
+        {
+          path: `${kbRoot}/invariant/INV-PURE-CORE.md`,
+          body: loadTemplate('invariants/INV-PURE-CORE.md').replace(
+            'holds_for: []',
+            formatHoldsFor(purePaths.length > 0 ? purePaths : allLayerPaths),
+          ),
+        },
+        {
+          path: `${kbRoot}/invariant/INV-FILE-SIZE.md`,
+          body: loadTemplate('invariants/INV-FILE-SIZE.md').replace(
+            'holds_for: []',
+            formatHoldsFor(allPaths),
+          ),
+        },
+      )
+    }
+
+    if (probe('package.json')) {
+      const parsedConfigRes = parseConfig(root, configObj)
+      if (parsedConfigRes.ok) {
+        const guardsPlan = planGuards(parsedConfigRes.config)
+        for (const f of guardsPlan.files) {
+          files.push(f)
+        }
+        for (const n of guardsPlan.notes) {
+          notes.push(n)
+        }
+      }
+    } else {
+      notes.push('kb guards: generated checkers currently target TypeScript/JavaScript projects only.')
+    }
+  }
+
   const configBody = `${JSON.stringify(configObj, null, 2)}\n`
 
   const dirs = [
@@ -118,7 +223,7 @@ export function planInit(root: string, options: InitOptions, probe: FsProbe): In
     `${kbRoot}/session`,
   ]
 
-  const files = [
+  files.push(
     { path: 'anchoring.config.json', body: configBody },
     { path: `${kbRoot}/README.md`, body: loadTemplate('README.md') },
     { path: `${adrDir}/0000-template.md`, body: loadTemplate('adr.md') },
@@ -134,7 +239,7 @@ export function planInit(root: string, options: InitOptions, probe: FsProbe): In
     { path: `${kbRoot}/incident/.gitkeep`, body: '' },
     { path: `${kbRoot}/hazard/.gitkeep`, body: '' },
     { path: `${kbRoot}/session/.gitkeep`, body: '' },
-  ]
+  )
 
   // Add the three gates to notes
   notes.push(

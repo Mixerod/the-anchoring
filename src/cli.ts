@@ -49,6 +49,7 @@ export function run(
     }
     const dryRun = rest.includes('--dry-run')
     const force = rest.includes('--force')
+    const guards = rest.includes('--guards')
 
     const initRoot = root ?? findGitRoot(process.cwd()) ?? process.cwd()
     const probe = defaultFsProbe(initRoot)
@@ -56,7 +57,7 @@ export function run(
 
     let plan: InitPlan
     try {
-      plan = planInit(initRoot, { kbRoot: kbRootArg, dryRun, force }, probe)
+      plan = planInit(initRoot, { kbRoot: kbRootArg, dryRun, force, guards }, probe)
     } catch (e) {
       err(`kb init: ${(e as Error).message}`)
       return 1
