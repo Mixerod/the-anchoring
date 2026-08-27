@@ -5,6 +5,7 @@
  *   kb init                bootstrap the intent graph into this repository
  *   kb verify [--strict]   check every claim the docs make about the code
  *   kb why <target>        what a file, symbol, or entity is for
+ *   kb guards [--check]    generate architecture checkers from the dependency matrix
  *
  * This file only routes. Checking lives in verify.ts, the reverse walk in why.ts,
  * and every byte of output in render.ts. Rationale: docs/THE_ANCHORING.md.
@@ -15,6 +16,7 @@ import { resolve } from 'node:path'
 import { findRepoRoot } from './root.js'
 import { loadConfig } from './config.js'
 import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type InitPlan } from './init.js'
+import { planGuards, checkGuards } from './guards.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
@@ -154,6 +156,64 @@ export function run(
         return 2
       }
       out(renderWhy(why(config, positional), palette))
+      return 0
+    }
+
+    case 'guards': {
+      if (!config.architecture) {
+        err(
+          'kb guards: no "architecture" block in anchoring.config.json — nothing to generate.\n\n' +
+            'Example "architecture" block to add to anchoring.config.json:\n' +
+            '{\n' +
+            '  "architecture": {\n' +
+            '    "layers": [\n' +
+            '      { "name": "ui", "paths": ["src/ui/", "apps/"] },\n' +
+            '      { "name": "domain", "paths": ["src/domain/"], "pure": true }\n' +
+            '    ],\n' +
+            '    "maxFileLines": 400,\n' +
+            '    "maxFunctionLines": 50\n' +
+            '  }\n' +
+            '}',
+        )
+        return 1
+      }
+
+      const probe = defaultFsProbe(config.root)
+      if (!probe('package.json')) {
+        err('kb guards: generated checkers currently target TypeScript/JavaScript projects only.')
+        return 1
+      }
+
+      const plan = planGuards(config)
+
+      if (rest.includes('--dry-run')) {
+        for (const file of plan.files) {
+          out(`--- ${file.path} ---\n${file.body}`)
+        }
+        return 0
+      }
+
+      const io = defaultInitIo(config.root)
+
+      if (rest.includes('--check')) {
+        const results = checkGuards(plan, io.readFile)
+        let allOk = true
+        for (const res of results) {
+          out(`${res.path}: ${res.state}`)
+          if (res.state !== 'ok') {
+            allOk = false
+          }
+        }
+        return allOk ? 0 : 1
+      }
+
+      for (const file of plan.files) {
+        io.writeFile(file.path, file.body)
+        out(`kb guards: wrote ${file.path}`)
+      }
+      for (const note of plan.notes) {
+        out(`\n${note}`)
+      }
       return 0
     }
 

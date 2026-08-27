@@ -29,7 +29,20 @@ export {
   type AnchoringConfig,
   type KindSpec,
   type ConfigResult,
+  type Layer,
+  type Architecture,
 } from './config.js'
+
+// Guards (Layer 3)
+export {
+  planGuards,
+  guardsHash,
+  checkGuards,
+  type GeneratedFile,
+  type GuardsPlan,
+  type GuardFileState,
+  type GuardCheckResult,
+} from './guards.js'
 
 // Repository root
 export { findRepoRoot } from './root.js'
