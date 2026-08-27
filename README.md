@@ -13,8 +13,8 @@ Read [`docs/THE_ANCHORING.md`](docs/THE_ANCHORING.md) for the architectural patt
 ### 1. Install & Initialize
 
 ```bash
-npm install -D @andru/the-anchoring
-# or: pnpm add -D @andru/the-anchoring
+npm install -D the-anchoring
+# or: pnpm add -D the-anchoring
 ```
 
 Bootstrap the intent graph in your repository root:

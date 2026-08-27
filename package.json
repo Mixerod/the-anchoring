@@ -1,5 +1,5 @@
 {
-  "name": "@andru/the-anchoring",
+  "name": "the-anchoring",
   "version": "0.1.0",
   "description": "An intent graph in git, anchored to code, machine-checked. Makes a repository legible to agents.",
   "license": "MIT",

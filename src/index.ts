@@ -1,5 +1,5 @@
 /**
- * @andru/the-anchoring — programmatic API for the intent graph.
+ * the-anchoring — programmatic API for the intent graph.
  *
  * See docs/THE_ANCHORING.md for the architectural pattern.
  */
