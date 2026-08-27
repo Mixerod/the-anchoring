@@ -30,5 +30,8 @@ jobs:
       - name: Run verification
         run: npm run verify
 
+      - name: Verify intent graph
+        run: npm run kb -- verify -- --strict
+
       - name: Build package
         run: npm run build

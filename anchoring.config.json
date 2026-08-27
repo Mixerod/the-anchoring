@@ -1,0 +1,31 @@
+{
+  "kbRoot": ".anchor",
+  "kinds": {
+    "ADR": {
+      "dir": "docs/adr"
+    },
+    "INV": {
+      "dir": ".anchor/invariant"
+    },
+    "FLOW": {
+      "dir": ".anchor/flow"
+    },
+    "WORK": {
+      "dir": ".anchor/work"
+    },
+    "INC": {
+      "dir": ".anchor/incident"
+    },
+    "HAZ": {
+      "dir": ".anchor/hazard"
+    }
+  },
+  "governedPaths": [
+    "src/"
+  ],
+  "hazard": {
+    "openDays": 30,
+    "ceiling": 24
+  },
+  "symbolIndex": "none"
+}

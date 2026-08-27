@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx kb done --check",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
