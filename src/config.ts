@@ -1,14 +1,32 @@
 /**
  * Configuration layer for the intent graph.
  *
- * Paths, id patterns, statuses, and hazard thresholds are configurable via
- * `anchoring.config.json` at the repository root. The schema itself (the six entity
+ * Paths, id patterns, statuses, hazard thresholds, and architecture matrices are configurable
+ * via `anchoring.config.json` at the repository root. The schema itself (the six entity
  * kinds, link fields, and edge semantics) is intentionally hardcoded in model.ts.
  */
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ENTITY_KINDS, type EntityKind } from './model.js'
+import {
+  type Layer,
+  type Architecture,
+  parseArchitecture,
+  isInvalidPosixRelPath,
+  DEFAULT_ENTRY_POINTS,
+  DEFAULT_MAX_FILE_LINES,
+  DEFAULT_MAX_FUNCTION_LINES,
+  DEFAULT_IMPURE_IMPORTS,
+} from './config-architecture.js'
+
+export type { Layer, Architecture }
+export {
+  DEFAULT_ENTRY_POINTS,
+  DEFAULT_MAX_FILE_LINES,
+  DEFAULT_MAX_FUNCTION_LINES,
+  DEFAULT_IMPURE_IMPORTS,
+}
 
 export interface KindSpec {
   readonly dir: string                      // repo-relative, forward slashes
@@ -24,6 +42,7 @@ export interface AnchoringConfig {
   readonly hazard: { readonly openDays: number; readonly ceiling: number }
   readonly symbolIndex: 'codegraph' | 'none'
   readonly sessionFile: string              // derived: `${kbRoot}/session/current`
+  readonly architecture?: Architecture
 }
 
 export const DEFAULT_KB_ROOT = '.anchor'
@@ -111,19 +130,16 @@ export function defaultConfig(root: string): AnchoringConfig {
   }
 }
 
-const KNOWN_TOP_KEYS = ['kbRoot', 'kinds', 'governedPaths', 'hazard', 'symbolIndex'] as const
+const KNOWN_TOP_KEYS = [
+  'kbRoot',
+  'kinds',
+  'governedPaths',
+  'hazard',
+  'symbolIndex',
+  'architecture',
+] as const
 const KNOWN_KIND_KEYS = ['dir', 'idPattern', 'statuses'] as const
 const KNOWN_HAZARD_KEYS = ['openDays', 'ceiling'] as const
-
-function isInvalidPosixRelPath(path: string): boolean {
-  return (
-    path.startsWith('/') ||
-    path.startsWith('\\') ||
-    /^[a-zA-Z]:/.test(path) ||
-    path.includes('..') ||
-    path.includes('\\')
-  )
-}
 
 export type ConfigProblems = readonly string[]
 export type ConfigResult =
@@ -328,6 +344,11 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
     }
   }
 
+  let architecture: Architecture | undefined
+  if (rawObj['architecture'] !== undefined) {
+    architecture = parseArchitecture(rawObj['architecture'], problems)
+  }
+
   // Check dir collisions between kinds
   const seenDirs = new Map<string, EntityKind>()
   for (const kind of ENTITY_KINDS) {
@@ -358,6 +379,7 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
       hazard,
       symbolIndex,
       sessionFile: `${kbRoot}/session/current`,
+      ...(architecture !== undefined ? { architecture } : {}),
     },
   }
 }
