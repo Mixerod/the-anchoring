@@ -66,9 +66,73 @@ export const SCALAR_FIELDS: Readonly<Record<EntityKind, readonly string[]>> = {
   INV: ['owner'],
   FLOW: [],
   WORK: ['owner'],
-  INC: [],
+  INC: [
+    'upstream',
+    'upstream_verdict',
+    'upstream_evidence',
+    'upstream_gate',
+    'upstream_rejected',
+    'upstream_recorded',
+    'upstream_work',
+  ],
   HAZ: ['source', 'observed', 'recorded', 'resolution', 'reason'],
 }
+
+/**
+ * How an incident may be attributed to a package other than this repository.
+ *
+ * **This list is closed, and the closedness is the mechanism, not an implementation
+ * detail.** Attribution's failure mode is over-attribution: an agent asked "is this the
+ * tool's fault?" says yes far more often than the truth warrants, and a classifier that
+ * can never say `no` reports noise until somebody switches it off. A fixed set of classes,
+ * each with a requirement `kb verify` can check, is what stops the judgment drifting; the
+ * default verdict is `local` and stays `local` until one of these four actually applies.
+ *
+ * A fifth class MUST NOT be added without a new ADR arguing why the four were
+ * insufficient. See docs/THE_ANCHORING.md, "The upstream loop".
+ *
+ * - `silent-gate`        a gate ran and stayed silent when it should have spoken
+ * - `generated-artifact` the defect is in a file the tool generated
+ * - `shipped-invariant`  a shipped invariant was wrong or insufficient
+ * - `schema-gap`         the schema cannot express what had to be expressed
+ */
+export const EVIDENCE_CLASSES = [
+  'silent-gate',
+  'generated-artifact',
+  'shipped-invariant',
+  'schema-gap',
+] as const
+export type EvidenceClass = (typeof EVIDENCE_CLASSES)[number]
+
+/** The four commands, and so the four gates a `silent-gate` incident may name. */
+export const UPSTREAM_GATES = ['verify', 'done', 'guards', 'owners'] as const
+export type UpstreamGate = (typeof UPSTREAM_GATES)[number]
+
+/** `local` is the default and requires nothing. Only the other two carry obligations. */
+export const UPSTREAM_VERDICTS = ['local', 'upstream', 'unclear'] as const
+export type UpstreamVerdict = (typeof UPSTREAM_VERDICTS)[number]
+
+/** The five invariants `kb init --guards` ships. `shipped-invariant` must name one. */
+export const SHIPPED_INVARIANTS = [
+  'INV-NO-CYCLES',
+  'INV-DEP-DIRECTION',
+  'INV-MODULE-ENTRY',
+  'INV-PURE-CORE',
+  'INV-FILE-SIZE',
+] as const
+
+/**
+ * A loop nobody closed must make noise, for the same reason an unread hazard must: an
+ * unread `UP-` is worse than none. Past this many days without an `upstream_work`, an
+ * escalated incident warns, and `--strict` turns that into a failed build.
+ */
+export const UPSTREAM_OPEN_DAYS = 60
+
+/**
+ * An unbounded backlog of other-people's-bugs is a graveyard — the same argument as the
+ * hazard ceiling. The 13th escalation must close one first.
+ */
+export const UPSTREAM_CEILING = 12
 
 /**
  * What a hazard's author has decided to do about it.

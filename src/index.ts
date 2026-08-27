@@ -11,9 +11,18 @@ export {
   SCALAR_FIELDS,
   EDGE_PHRASE,
   HAZARD_RESOLUTIONS,
+  EVIDENCE_CLASSES,
+  UPSTREAM_GATES,
+  UPSTREAM_VERDICTS,
+  SHIPPED_INVARIANTS,
+  UPSTREAM_OPEN_DAYS,
+  UPSTREAM_CEILING,
   kindOf,
   type EntityKind,
   type LinkField,
+  type EvidenceClass,
+  type UpstreamGate,
+  type UpstreamVerdict,
 } from './model.js'
 
 // Configuration
@@ -61,6 +70,8 @@ export {
   planOwners,
   OWNERS_START_MARKER,
   OWNERS_END_MARKER,
+  LEGACY_OWNERS_START_MARKER,
+  LEGACY_OWNERS_END_MARKER,
   type OwnershipMapping,
   type OwnersReport,
 } from './owners.js'
@@ -75,6 +86,7 @@ export { loadStore, readEntity, listMarkdown, readFrontmatter } from './loader.j
 // Anchors & Resolving
 export {
   parseAnchor,
+  parseProbeOutput,
   checkAnchors,
   type Anchor,
   type AnchorResult,
@@ -89,6 +101,8 @@ export { rememberWork, recallWork } from './session.js'
 
 // Verification
 export { verify, type VerifyReport, type Finding, type Severity } from './verify.js'
+export { checkHazard, checkHazardCeiling } from './verify-hazard.js'
+export { checkUpstream, checkUpstreamCeiling, isEscalated } from './verify-upstream.js'
 
 // Why (Reverse walk)
 export { why, type WhyReport, type CodeMention, type EntityEdge } from './why.js'
@@ -107,7 +121,7 @@ export {
 } from './done.js'
 
 // Git I/O
-export { gitChangedFiles, type ChangedFiles } from './git.js'
+export { gitChangedFiles, parseChangedFiles, type ChangedFiles } from './git.js'
 
 // Init
 export {
