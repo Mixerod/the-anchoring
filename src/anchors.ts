@@ -32,6 +32,8 @@ export interface AnchorResult {
   readonly detail?: string
 }
 
+export type AnchorResolution = AnchorResult
+
 export function parseAnchor(raw: string): Anchor | undefined {
   const [prefix, ...rest] = raw.split(':')
   const value = rest.join(':').trim()

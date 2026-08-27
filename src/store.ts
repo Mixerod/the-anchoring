@@ -57,7 +57,7 @@ function listMarkdown(dir: string): readonly string[] {
     .filter((p) => statSync(p).isFile())
 }
 
-function readEntity(config: AnchoringConfig, path: string, expected: EntityKind): Entity | LoadProblem {
+export function readEntity(config: AnchoringConfig, path: string, expected: EntityKind): Entity | LoadProblem {
   const rel = relative(config.root, path).split(sep).join('/')
   const parsed = readFrontmatter(path)
   if (!parsed.ok) return { path: rel, message: parsed.reason }

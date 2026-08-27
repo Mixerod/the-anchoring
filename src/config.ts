@@ -85,8 +85,7 @@ export const DEFAULT_HAZARD = {
 
 export const DEFAULT_SYMBOL_INDEX: 'codegraph' | 'none' = 'codegraph'
 
-export function defaultConfig(root: string): AnchoringConfig {
-  const kbRoot = DEFAULT_KB_ROOT
+function defaultKinds(kbRoot: string): Record<EntityKind, KindSpec> {
   const kinds = {} as Record<EntityKind, KindSpec>
   for (const k of ENTITY_KINDS) {
     const spec = DEFAULT_KINDS[k]
@@ -96,10 +95,15 @@ export function defaultConfig(root: string): AnchoringConfig {
       statuses: spec.statuses,
     }
   }
+  return kinds
+}
+
+export function defaultConfig(root: string): AnchoringConfig {
+  const kbRoot = DEFAULT_KB_ROOT
   return {
     root,
     kbRoot,
-    kinds,
+    kinds: defaultKinds(kbRoot),
     governedPaths: DEFAULT_GOVERNED_PATHS,
     hazard: DEFAULT_HAZARD,
     symbolIndex: DEFAULT_SYMBOL_INDEX,
@@ -121,10 +125,12 @@ function isInvalidPosixRelPath(path: string): boolean {
   )
 }
 
-export function parseConfig(
-  root: string,
-  raw: unknown,
-): { ok: true; config: AnchoringConfig } | { ok: false; problems: readonly string[] } {
+export type ConfigProblems = readonly string[]
+export type ConfigResult =
+  | { readonly ok: true; readonly config: AnchoringConfig }
+  | { readonly ok: false; readonly problems: ConfigProblems }
+
+export function parseConfig(root: string, raw: unknown): ConfigResult {
   const problems: string[] = []
 
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -154,7 +160,7 @@ export function parseConfig(
     }
   }
 
-  const kinds = {} as Record<EntityKind, KindSpec>
+  const kinds = defaultKinds(kbRoot)
 
   if (rawObj['kinds'] !== undefined) {
     if (
@@ -176,23 +182,10 @@ export function parseConfig(
       for (const kind of ENTITY_KINDS) {
         const defaultSpec = DEFAULT_KINDS[kind]
         const rawSpec = rawKinds[kind]
-
-        if (rawSpec === undefined) {
-          kinds[kind] = {
-            dir: defaultSpec.dir(kbRoot),
-            idPattern: defaultSpec.idPattern,
-            statuses: defaultSpec.statuses,
-          }
-          continue
-        }
+        if (rawSpec === undefined) continue
 
         if (typeof rawSpec !== 'object' || rawSpec === null || Array.isArray(rawSpec)) {
           problems.push(`kinds.${kind} must be an object`)
-          kinds[kind] = {
-            dir: defaultSpec.dir(kbRoot),
-            idPattern: defaultSpec.idPattern,
-            statuses: defaultSpec.statuses,
-          }
           continue
         }
 
@@ -257,15 +250,6 @@ export function parseConfig(
         }
 
         kinds[kind] = { dir, idPattern, statuses }
-      }
-    }
-  } else {
-    for (const kind of ENTITY_KINDS) {
-      const defaultSpec = DEFAULT_KINDS[kind]
-      kinds[kind] = {
-        dir: defaultSpec.dir(kbRoot),
-        idPattern: defaultSpec.idPattern,
-        statuses: defaultSpec.statuses,
       }
     }
   }
@@ -378,9 +362,7 @@ export function parseConfig(
   }
 }
 
-export function loadConfig(
-  root: string,
-): { ok: true; config: AnchoringConfig } | { ok: false; problems: readonly string[] } {
+export function loadConfig(root: string): ConfigResult {
   const configPath = join(root, 'anchoring.config.json')
   if (!existsSync(configPath)) {
     return { ok: true, config: defaultConfig(root) }

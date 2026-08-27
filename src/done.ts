@@ -16,8 +16,16 @@ import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { parseAnchor } from './anchors.js'
 import type { AnchoringConfig } from './config.js'
 
+export type GapKind = 'unlinked-decision' | 'unclaimed-code' | 'status' | 'open-incident'
+
 export interface Gap {
-  readonly kind: 'unlinked-decision' | 'unclaimed-code' | 'status' | 'open-incident'
+  readonly kind: GapKind
+  readonly message: string
+  readonly fix: string
+}
+
+export interface UnclaimedWorkReport {
+  readonly files: readonly string[]
   readonly message: string
   readonly fix: string
 }

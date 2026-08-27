@@ -21,6 +21,14 @@ export interface Mention {
   readonly matched: string
 }
 
+export type CodeMention = Mention
+
+export interface EntityEdge {
+  readonly field: string
+  readonly target?: Entity
+  readonly source?: Entity
+}
+
 export interface WhyReport {
   readonly query: string
   readonly subject?: Entity
