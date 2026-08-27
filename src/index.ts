@@ -121,7 +121,14 @@ export {
 } from './done.js'
 
 // Git I/O
-export { gitChangedFiles, parseChangedFiles, type ChangedFiles } from './git.js'
+export {
+  gitChangedFiles,
+  parseChangedFiles,
+  gitIsDirty,
+  parseDirty,
+  type ChangedFiles,
+  type IsDirty,
+} from './git.js'
 
 // Init
 export {
@@ -167,6 +174,11 @@ export {
   type UpstreamFileState,
   type ExistingReport,
   type FileState,
+  planOpenWork,
+  addUpstreamWork,
+  nextWorkId,
+  reportPackage,
+  type OpenWorkPlan,
 } from './upstream.js'
 export { runUpstream, readPackageFacts, readExistingReports } from './cli-upstream.js'
 

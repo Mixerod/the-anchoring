@@ -10,18 +10,23 @@
  * carried by a person. See docs/THE_ANCHORING.md, "The upstream loop".
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defaultInitIo } from './init.js'
 import { loadStore } from './loader.js'
+import { loadConfig } from './root.js'
+import { gitIsDirty, type IsDirty } from './git.js'
+import type { Store } from './store.js'
 import {
   UPSTREAM_BANNER,
   checkUpstream,
   listUpstream,
+  planOpenWork,
   planUpstream,
   type ExistingReport,
   type PackageFacts,
+  type UpstreamPlan,
 } from './upstream.js'
 import type { AnchoringConfig } from './config.js'
 
@@ -80,10 +85,130 @@ export function readExistingReports(root: string, dir: string): readonly Existin
   return found
 }
 
+/**
+ * `--open-work <path>` — open the work item in the upstream repository, and stop.
+ *
+ * Every refusal below is a refusal to write into somebody else's repository on a guess.
+ * MUST NOT: edit any other file upstream, run its tests, install anything, commit, push,
+ * or open a pull request. It writes exactly two files — one new `W-` upstream, and the
+ * `upstream_work:` line in the downstream incident — and prints both paths.
+ */
+function openWork(
+  config: AnchoringConfig,
+  plan: UpstreamPlan,
+  store: Store,
+  target: string,
+  out: (text: string) => void,
+  err: (text: string) => void,
+  isDirty: IsDirty,
+): number {
+  const upstreamRoot = resolve(config.root, target)
+
+  if (!existsSync(join(upstreamRoot, 'anchoring.config.json'))) {
+    err(`kb upstream --open-work: ${target} has no anchoring.config.json`)
+    return 1
+  }
+
+  // Before anything else: never write into a tree somebody is mid-change in. `undefined`
+  // means git could not tell, and "could not tell" is not permission.
+  const dirty = isDirty(upstreamRoot)
+  if (dirty !== false) {
+    err(
+      dirty === undefined
+        ? `kb upstream --open-work: cannot read git status in ${target}; refusing to write`
+        : `kb upstream --open-work: ${target} has uncommitted changes; commit or stash them first`,
+    )
+    return 1
+  }
+
+  const upstreamConfig = loadConfig(upstreamRoot)
+  if (!upstreamConfig.ok) {
+    for (const problem of upstreamConfig.problems) err(`upstream config error: ${problem}`)
+    return 1
+  }
+
+  const workDir = upstreamConfig.config.kinds.WORK.dir
+  const workFiles = listWorkFiles(upstreamRoot, workDir)
+  const upstreamFacts = {
+    hasConfig: true,
+    packageName: readPackageName(upstreamRoot),
+    workDir,
+    existingWorkIds: workFiles.map((f) => f.id),
+    workTexts: workFiles.map((f) => f.text),
+  }
+  const downstreamDirName = basename(config.root)
+
+  let wrote = 0
+  for (const report of plan.reports) {
+    const incident = store.byId.get(report.about)
+    if (!incident) continue
+    if (incident.fields['upstream_work']) continue
+
+    const incidentText = readFileSync(join(config.root, incident.path), 'utf8')
+    const decision = planOpenWork(report, incident, incidentText, upstreamFacts, downstreamDirName)
+
+    if (!decision.ok) {
+      err(`kb upstream --open-work: ${report.id}: ${decision.reason}`)
+      return 1
+    }
+
+    writeFileSync(join(upstreamRoot, decision.workPath), decision.workBody)
+    writeFileSync(join(config.root, decision.incidentPath), decision.incidentBody)
+    out(`kb upstream: wrote ${join(target, decision.workPath).split('\\').join('/')}`)
+    out(`kb upstream: wrote ${decision.incidentPath}`)
+
+    // Keep the in-memory facts current so a second report in the same run does not
+    // allocate the same W- id.
+    upstreamFacts.existingWorkIds = [...upstreamFacts.existingWorkIds, decision.workId]
+    upstreamFacts.workTexts = [...upstreamFacts.workTexts, decision.workBody]
+    wrote += 1
+  }
+
+  if (wrote === 0) out('kb upstream: every escalated incident already has a work item.')
+  // Nothing is committed, in either repository. That is the caller's decision.
+  return 0
+}
+
+function readPackageName(root: string): string | undefined {
+  try {
+    return (JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name?: string }).name
+  } catch {
+    return undefined
+  }
+}
+
+function listWorkFiles(
+  root: string,
+  workDir: string,
+): readonly { readonly id: string; readonly text: string }[] {
+  let names: readonly string[]
+  try {
+    names = readdirSync(join(root, workDir)).filter((n) => /^W-\d+\.md$/.test(n))
+  } catch {
+    return []
+  }
+  return names.flatMap((name) => {
+    try {
+      return [{ id: name.replace(/\.md$/, ''), text: readFileSync(join(root, workDir, name), 'utf8') }]
+    } catch {
+      return []
+    }
+  })
+}
+
+/** `--open-work <path>` or `--open-work=<path>`. */
+function openWorkTarget(rest: readonly string[]): string | undefined {
+  const i = rest.indexOf('--open-work')
+  if (i !== -1) return rest[i + 1]
+  return rest.find((a) => a.startsWith('--open-work='))?.slice('--open-work='.length)
+}
+
 export function runUpstream(
   config: AnchoringConfig,
   rest: readonly string[],
   out: (text: string) => void,
+  err: (text: string) => void = out,
+  isDirty: IsDirty = gitIsDirty,
 ): number {
   const io = defaultInitIo(config.root)
   const store = loadStore(config)
@@ -115,6 +240,11 @@ export function runUpstream(
     readPackageFacts(),
     readExistingReports(config.root, `${config.kbRoot}/upstream`),
   )
+
+  const target = openWorkTarget(rest)
+  if (target !== undefined) {
+    return openWork(config, plan, store, target, out, err, isDirty)
+  }
 
   if (rest.includes('--dry-run')) {
     for (const report of plan.reports) {

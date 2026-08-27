@@ -350,3 +350,143 @@ export function openLoopNotices(store: Store): readonly string[] {
   }
   return notices
 }
+
+/** What `--open-work` will write, or the reason it will not. */
+export type OpenWorkPlan =
+  | { readonly ok: false; readonly reason: string }
+  | {
+      readonly ok: true
+      readonly workId: string
+      readonly workPath: string
+      readonly workBody: string
+      readonly incidentPath: string
+      readonly incidentBody: string
+    }
+
+/** The `package:` line of a generated report, read back without a YAML parse. */
+export function reportPackage(reportBody: string): string | undefined {
+  return reportBody.match(/^package: (\S+)$/m)?.[1]
+}
+
+/**
+ * The next free `W-<n>` in a set of work ids, allocated by taking the highest and adding
+ * one. Deliberately not "the lowest gap": reusing the id of a deleted work item makes two
+ * different tasks share a name across git history.
+ */
+export function nextWorkId(existing: readonly string[]): string {
+  const highest = existing.reduce((max, id) => {
+    const n = Number(id.match(/^W-(\d+)$/)?.[1])
+    return Number.isFinite(n) && n > max ? n : max
+  }, 0)
+  return `W-${highest + 1}`
+}
+
+/**
+ * Add `upstream_work:` to a downstream incident's frontmatter.
+ *
+ * The incident is hand-editable and this is the only field the tool ever writes into one;
+ * the generated `UP-` file is never touched, because a generated artifact that a command
+ * writes into is a generated artifact whose drift check means nothing. Idempotent: an
+ * incident that already carries the field is returned unchanged.
+ */
+export function addUpstreamWork(incidentText: string, workId: string): string {
+  if (/^upstream_work:/m.test(incidentText)) return incidentText
+
+  const lines = incidentText.split(/\r?\n/)
+  if (lines[0]?.trim() !== '---') return incidentText
+
+  const closing = lines.findIndex((line, i) => i > 0 && line.trim() === '---')
+  if (closing === -1) return incidentText
+
+  // Immediately after the last `upstream_*` line if there is one, so the block stays
+  // together; otherwise at the end of the frontmatter.
+  let insertAt = closing
+  for (let i = 1; i < closing; i++) {
+    if (/^upstream(_[a-z]+)?:/.test(lines[i] ?? '')) insertAt = i + 1
+  }
+
+  return [...lines.slice(0, insertAt), `upstream_work: ${workId}`, ...lines.slice(insertAt)].join(
+    '\n',
+  )
+}
+
+/**
+ * Everything `--open-work` decides, with no filesystem and no git.
+ *
+ * The refusals are the interesting part, and each is a separate `reason` string so the
+ * caller prints what actually went wrong. Approved scope is narrow on purpose: generate
+ * the report, open the work item, stop. The agent does not fix the upstream code and does
+ * not commit in either repository.
+ */
+export function planOpenWork(
+  report: UpstreamReport,
+  incident: Entity,
+  incidentText: string,
+  upstream: {
+    readonly hasConfig: boolean
+    readonly packageName: string | undefined
+    readonly workDir: string
+    readonly existingWorkIds: readonly string[]
+    readonly workTexts: readonly string[]
+  },
+  downstreamDirName: string,
+): OpenWorkPlan {
+  if (!upstream.hasConfig) {
+    return { ok: false, reason: 'the upstream path has no anchoring.config.json' }
+  }
+
+  const expected = reportPackage(report.body)
+  if (expected === undefined) {
+    return { ok: false, reason: `${report.id} names no package` }
+  }
+  if (upstream.packageName !== expected) {
+    return {
+      ok: false,
+      reason: `the upstream repository provides \`${upstream.packageName ?? '(no package name)'}\`, but ${report.id} names \`${expected}\``,
+    }
+  }
+
+  // Idempotent by construction: a work item that already cites this UP- is the answer.
+  if (upstream.workTexts.some((text) => text.includes(report.id))) {
+    return { ok: false, reason: `a work item in the upstream repository already references ${report.id}` }
+  }
+
+  const workId = nextWorkId(upstream.existingWorkIds)
+  const workBody = [
+    '---',
+    `id: ${workId}`,
+    `title: ${incident.title}`,
+    'status: todo',
+    'implements: []',
+    'touches: []',
+    'closes: []',
+    'blocked_by: []',
+    '---',
+    '',
+    `# ${workId}: ${incident.title}`,
+    '',
+    '## Goal',
+    '',
+    `Reported from downstream by \`${downstreamDirName}\`, in ${report.id} (\`${report.about}\`).`,
+    `Evidence class: \`${incident.fields['upstream_evidence'] ?? '(none)'}\`.`,
+    '',
+    'Read the report the adopter carried across before starting. Reproduce it before',
+    'fixing it: a fix with no failing case first is a guess.',
+    '',
+    '## Done when',
+    '',
+    '- the case that should have spoken is written down and currently fails',
+    '- it passes',
+    `- ${report.id} is marked \`accepted\` or \`declined\` in the downstream repository`,
+    '',
+  ].join('\n')
+
+  return {
+    ok: true,
+    workId,
+    workPath: `${upstream.workDir}/${workId}.md`,
+    workBody,
+    incidentPath: incident.path,
+    incidentBody: addUpstreamWork(incidentText, workId),
+  }
+}

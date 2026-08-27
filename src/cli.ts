@@ -288,7 +288,7 @@ export function run(
     }
 
     case 'upstream':
-      return runUpstream(config, rest, out)
+      return runUpstream(config, rest, out, err)
 
     default:
       err(USAGE)

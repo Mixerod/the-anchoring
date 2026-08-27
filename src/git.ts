@@ -48,3 +48,34 @@ export const gitChangedFiles: ChangedFiles = (root) => {
   )
 }
 /* c8 ignore stop */
+
+/**
+ * The pure half of `gitIsDirty`: whether `git status --porcelain` reported anything.
+ *
+ * A non-zero exit is reported as *not* dirty by the caller, deliberately: "git failed" and
+ * "the tree has changes" are different facts, and only the caller knows whether it may
+ * proceed on the first.
+ */
+export function parseDirty(statusStdout: string): boolean {
+  return statusStdout.split('\n').some((line) => line.trim() !== '')
+}
+
+export type IsDirty = (root: string) => boolean | undefined
+
+/**
+ * Whether a repository has uncommitted changes. `undefined` means git could not tell —
+ * not a directory, not a repository, git missing. The caller must refuse on `undefined`
+ * rather than assume clean: writing into somebody's work in progress is how a helpful tool
+ * becomes an unwelcome one.
+ */
+/* c8 ignore start -- spawn-and-delegate; the decision it delegates to is parseDirty */
+export const gitIsDirty: IsDirty = (root) => {
+  const result = spawnSync('git', ['status', '--porcelain'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 20_000,
+  })
+  if (result.error || result.status !== 0) return undefined
+  return parseDirty(result.stdout)
+}
+/* c8 ignore stop */

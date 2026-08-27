@@ -113,7 +113,8 @@ export const USAGE =
   '  kb verify [--strict]   check every claim the docs make about the code\n' +
   '  kb guards [--check]    generate checkers from the architecture matrix\n' +
   '  kb owners [--check]    project ownership into CODEOWNERS\n' +
-  '  kb upstream [--check]  project attributable incidents into reviewable reports\n'
+  '  kb upstream [--check]  project attributable incidents into reviewable reports\n' +
+  '                         --list, --dry-run, --open-work <path-to-upstream-repo>\n'
 
 export function renderCtx(report: CtxReport, c: Palette = COLOUR): string {
   const { subject } = report
