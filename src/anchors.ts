@@ -3,8 +3,8 @@
  *
  * An anchor is a stable reference to code. Two forms, deliberately no third:
  *
- *   file:packages/core/src/tempo/costs.ts   verified against the filesystem
- *   sym:tempoCost                           verified against the codegraph index
+ *   file:src/verify.ts   verified against the filesystem
+ *   sym:tempoCost        verified against the codegraph index
  *
  * Line numbers are not an anchor form and never will be. They rot within one commit,
  * and a reference that silently becomes wrong is worse than no reference at all.
@@ -15,6 +15,7 @@
 import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
+import type { AnchoringConfig } from './config.js'
 
 /** Symbol names are passed to a child process; refuse anything that is not one. */
 const SYMBOL_RE = /^[A-Za-z_$][A-Za-z0-9_$.]*$/
@@ -40,8 +41,8 @@ export function parseAnchor(raw: string): Anchor | undefined {
   return undefined
 }
 
-export function hasCodegraphIndex(root: string): boolean {
-  return existsSync(join(root, '.codegraph'))
+export function hasCodegraphIndex(config: AnchoringConfig): boolean {
+  return existsSync(join(config.root, '.codegraph'))
 }
 
 /**
@@ -80,8 +81,8 @@ export interface Resolver {
   readonly indexed: boolean
 }
 
-export function createResolver(root: string, probe: SymbolProbe = codegraphProbe): Resolver {
-  const indexed = hasCodegraphIndex(root)
+export function createResolver(config: AnchoringConfig, probe: SymbolProbe = codegraphProbe): Resolver {
+  const indexed = config.symbolIndex === 'codegraph' && hasCodegraphIndex(config)
   const cache = new Map<string, AnchorResult>()
 
   const resolve = (raw: string): AnchorResult => {
@@ -94,14 +95,21 @@ export function createResolver(root: string, probe: SymbolProbe = codegraphProbe
         return { raw, status: 'malformed', detail: 'expected `file:<path>` or `sym:<name>`' }
       }
       if (anchor.form === 'file') {
-        return existsSync(join(root, anchor.value))
+        return existsSync(join(config.root, anchor.value))
           ? { raw, status: 'resolved' }
           : { raw, status: 'missing', detail: 'no such file' }
+      }
+      if (config.symbolIndex === 'none') {
+        return {
+          raw,
+          status: 'unverifiable',
+          detail: 'symbol index disabled in anchoring.config.json',
+        }
       }
       if (!indexed) {
         return { raw, status: 'unverifiable', detail: 'no .codegraph index — run `codegraph init`' }
       }
-      const found = probe(root, anchor.value)
+      const found = probe(config.root, anchor.value)
       if (found === undefined) {
         return { raw, status: 'unverifiable', detail: 'codegraph query failed' }
       }

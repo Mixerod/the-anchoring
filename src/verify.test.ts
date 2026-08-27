@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { verify, type Finding } from './verify.js'
+import { defaultConfig } from './config.js'
 
 interface Doc {
   readonly path: string
@@ -19,11 +20,13 @@ function fixture(...docs: readonly Doc[]): string {
   return root
 }
 
+const conf = (root: string) => defaultConfig(root)
+
 const adr = (path: string, body: string): Doc => ({ path: `docs/adr/${path}`, body })
-const inv = (path: string, body: string): Doc => ({ path: `.dicebound/invariant/${path}`, body })
+const inv = (path: string, body: string): Doc => ({ path: `.anchor/invariant/${path}`, body })
 
 const errors = (root: string): readonly Finding[] =>
-  verify(root).findings.filter((f) => f.severity === 'error')
+  verify(conf(root)).findings.filter((f) => f.severity === 'error')
 
 describe('verify', () => {
   test('passes a document whose anchors and references all resolve', () => {
@@ -36,8 +39,8 @@ describe('verify', () => {
       ),
     )
 
-    expect(verify(root).findings).toEqual([])
-    expect(verify(root).entityCount).toBe(2)
+    expect(verify(conf(root)).findings).toEqual([])
+    expect(verify(conf(root)).entityCount).toBe(2)
   })
 
   test('fails an anchor pointing at a file that no longer exists', () => {
@@ -115,7 +118,7 @@ describe('verify', () => {
     const root = fixture(
       adr('0001-a.md', '---\nid: ADR-0001\ntitle: A\nstatus: accepted\ngoverns:\n  - sym:tempoCost\n---\n'),
     )
-    const report = verify(root)
+    const report = verify(conf(root))
 
     expect(report.indexed).toBe(false)
     expect(report.findings.map((f) => f.severity)).toEqual(['warn'])
@@ -125,7 +128,7 @@ describe('verify', () => {
   test('ignores the ADR template, which is a form rather than a decision', () => {
     const root = fixture(adr('0000-template.md', '# ADR-NNNN: title\n\n- **Status:** Proposed\n'))
 
-    expect(verify(root)).toMatchObject({ findings: [], entityCount: 0 })
+    expect(verify(conf(root))).toMatchObject({ findings: [], entityCount: 0 })
   })
 
   test('reports a missing frontmatter block against the document path', () => {

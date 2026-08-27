@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { verify, type Finding } from './verify.js'
+import { defaultConfig } from './config.js'
 
 /**
  * HAZ- is the one kind whose value comes entirely from its constraints. A hazard with no
@@ -26,8 +27,10 @@ function fixture(...docs: readonly Doc[]): string {
   return root
 }
 
-const haz = (id: string, body: string): Doc => ({ path: `.dicebound/hazard/${id}.md`, body })
-const inv = (id: string, body: string): Doc => ({ path: `.dicebound/invariant/${id}.md`, body })
+const conf = (root: string) => defaultConfig(root)
+
+const haz = (id: string, body: string): Doc => ({ path: `.anchor/hazard/${id}.md`, body })
+const inv = (id: string, body: string): Doc => ({ path: `.anchor/invariant/${id}.md`, body })
 
 const code: Doc = { path: 'src/thing.ts', body: 'export const x = 1\n' }
 const INV_X = inv('INV-X', '---\nid: INV-X\ntitle: X holds\nstatus: active\n---\n')
@@ -50,7 +53,7 @@ function hazard(
 
 const NOW = new Date('2026-08-23T00:00:00Z')
 
-const findings = (root: string, now: Date = NOW): readonly Finding[] => verify(root, now).findings
+const findings = (root: string, now: Date = NOW): readonly Finding[] => verify(conf(root), now).findings
 const errors = (root: string, now: Date = NOW): readonly Finding[] =>
   findings(root, now).filter((f) => f.severity === 'error')
 const warnings = (root: string, now: Date = NOW): readonly Finding[] =>
@@ -61,7 +64,7 @@ describe('hazard schema', () => {
     const root = fixture(code, hazard('HAZ-0001', 'resolution: open\n'))
 
     expect(findings(root)).toEqual([])
-    expect(verify(root, NOW).entityCount).toBe(1)
+    expect(verify(conf(root), NOW).entityCount).toBe(1)
   })
 
   test('accepts a guarded hazard that names an invariant that exists', () => {
@@ -211,7 +214,7 @@ describe('the 30-day clock on open', () => {
 
   test('a retired hazard is not chased', () => {
     const root = fixture(code, {
-      path: '.dicebound/hazard/HAZ-0001.md',
+      path: '.anchor/hazard/HAZ-0001.md',
       body:
         '---\nid: HAZ-0001\ntitle: A mechanism\nstatus: retired\nsource: https://example.org/r\n' +
         'observed: 2013-03-11\nrecorded: 2020-01-01\nresolution: open\n' +
@@ -267,7 +270,7 @@ describe('the ceiling of 24', () => {
 
   test('retired hazards do not count toward the ceiling', () => {
     const retired: Doc = {
-      path: '.dicebound/hazard/HAZ-9999.md',
+      path: '.anchor/hazard/HAZ-9999.md',
       body:
         '---\nid: HAZ-9999\ntitle: Old\nstatus: retired\nsource: https://example.org/r\n' +
         'observed: 2013-03-11\nrecorded: 2026-08-23\nresolution: open\n' +

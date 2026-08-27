@@ -14,6 +14,7 @@ import { LINK_FIELDS } from './model.js'
 import { loadStore, type Entity, type Store } from './store.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { parseAnchor } from './anchors.js'
+import type { AnchoringConfig } from './config.js'
 
 export interface Gap {
   readonly kind: 'unlinked-decision' | 'unclaimed-code' | 'status' | 'open-incident'
@@ -36,10 +37,8 @@ export interface DoneReport {
  * cries wolf on every turn is one that gets switched off. Config and docs may still be
  * anchored — `kb why` will answer for them — they are simply not chased.
  */
-const NEEDS_A_REASON = ['packages/', 'apps/', 'scripts/']
-
-const isGoverned = (path: string): boolean =>
-  NEEDS_A_REASON.some((prefix) => path.startsWith(prefix))
+const isGoverned = (path: string, config: AnchoringConfig): boolean =>
+  config.governedPaths.some((prefix) => path.startsWith(prefix))
 
 function anchorPaths(entity: Entity): readonly string[] {
   const spec = LINK_FIELDS[entity.kind]
@@ -74,10 +73,10 @@ function decisionGaps(work: Entity, changed: readonly string[], store: Store): r
     })
 }
 
-function coverageGaps(changed: readonly string[], store: Store): readonly Gap[] {
+function coverageGaps(changed: readonly string[], store: Store, config: AnchoringConfig): readonly Gap[] {
   const anchors = [...store.byId.values()].flatMap(anchorPaths)
   const orphans = changed
-    .filter(isGoverned)
+    .filter((file) => isGoverned(file, config))
     .filter((file) => !anchors.some((a) => covers(a, file)))
 
   return orphans.length === 0
@@ -111,16 +110,16 @@ function incidentGaps(changed: readonly string[], store: Store): readonly Gap[] 
  *
  * The silence itself was right and is kept for docs, config, and the knowledge base — a
  * hook that scolds on every unrelated turn is switched off within a week, and then nothing
- * is enforced at all. It is only broken for the `NEEDS_A_REASON` allowlist, the same one
+ * is enforced at all. It is only broken for the `governedPaths` allowlist, the same one
  * `coverageGaps` uses, so the two cannot drift apart.
  *
  * Returns `null` when there is nothing to say. Never an error, never a failed turn.
  */
 export function unclaimedWork(
-  changedFiles: ChangedFiles,
-  root = '.',
+  config: AnchoringConfig,
+  changedFiles: ChangedFiles = gitChangedFiles,
 ): { readonly files: readonly string[]; readonly message: string; readonly fix: string } | null {
-  const files = changedFiles(root).filter(isGoverned)
+  const files = changedFiles(config.root).filter((path) => isGoverned(path, config))
   if (files.length === 0) return null
 
   return {
@@ -131,13 +130,13 @@ export function unclaimedWork(
 }
 
 export function done(
-  root: string,
+  config: AnchoringConfig,
   workId: string,
   changedFiles: ChangedFiles = gitChangedFiles,
 ): DoneReport {
-  const store = loadStore(root)
+  const store = loadStore(config)
   const work = store.byId.get(workId)
-  const changed = changedFiles(root)
+  const changed = changedFiles(config.root)
 
   if (!work || work.kind !== 'WORK') {
     return {
@@ -147,7 +146,7 @@ export function done(
         {
           kind: 'status',
           message: `no work item \`${workId}\``,
-          fix: `create .dicebound/work/${workId}.md, or name the item you are working on`,
+          fix: `create ${config.kinds.WORK.dir}/${workId}.md, or name the item you are working on`,
         },
       ],
     }
@@ -171,7 +170,7 @@ export function done(
     gaps: [
       ...decisionGaps(work, changed, store),
       ...incidentGaps(changed, store),
-      ...coverageGaps(changed, store),
+      ...coverageGaps(changed, store, config),
       ...statusGap,
     ],
   }

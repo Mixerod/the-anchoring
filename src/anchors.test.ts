@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createResolver, parseAnchor } from './anchors.js'
+import { defaultConfig } from './config.js'
 
 function scratch(): string {
   const root = mkdtempSync(join(tmpdir(), 'kb-anchor-'))
@@ -10,6 +11,8 @@ function scratch(): string {
   writeFileSync(join(root, 'src', 'real.ts'), 'export const x = 1\n')
   return root
 }
+
+const conf = (root: string) => defaultConfig(root)
 
 describe('parseAnchor', () => {
   test('reads the two supported forms', () => {
@@ -51,26 +54,26 @@ describe('parseAnchor', () => {
 
 describe('createResolver', () => {
   test('resolves a path that exists', () => {
-    const resolver = createResolver(scratch())
+    const resolver = createResolver(conf(scratch()))
 
     expect(resolver.resolve('file:src/real.ts').status).toBe('resolved')
   })
 
   test('reports a path that does not exist as missing', () => {
-    const result = createResolver(scratch()).resolve('file:src/gone.ts')
+    const result = createResolver(conf(scratch())).resolve('file:src/gone.ts')
 
     expect(result.status).toBe('missing')
     expect(result.detail).toBe('no such file')
   })
 
   test('reports a malformed anchor rather than silently ignoring it', () => {
-    const result = createResolver(scratch()).resolve('packages/core/src/state.ts')
+    const result = createResolver(conf(scratch())).resolve('packages/core/src/state.ts')
 
     expect(result.status).toBe('malformed')
   })
 
   test('downgrades symbol anchors to unverifiable when no codegraph index exists', () => {
-    const resolver = createResolver(scratch())
+    const resolver = createResolver(conf(scratch()))
 
     expect(resolver.indexed).toBe(false)
     expect(resolver.resolve('sym:applyCommand')).toMatchObject({
@@ -80,7 +83,7 @@ describe('createResolver', () => {
   })
 
   test('caches a result so a repeated anchor costs one lookup', () => {
-    const resolver = createResolver(scratch())
+    const resolver = createResolver(conf(scratch()))
 
     expect(resolver.resolve('file:src/real.ts')).toBe(resolver.resolve('file:src/real.ts'))
   })
@@ -94,14 +97,14 @@ describe('createResolver, with an index present', () => {
   }
 
   test('resolves a symbol the index knows', () => {
-    const resolver = createResolver(indexedScratch(), () => true)
+    const resolver = createResolver(conf(indexedScratch()), () => true)
 
     expect(resolver.indexed).toBe(true)
     expect(resolver.resolve('sym:applyCommand').status).toBe('resolved')
   })
 
   test('reports a symbol the index does not know as missing', () => {
-    const result = createResolver(indexedScratch(), () => false).resolve('sym:renamedAway')
+    const result = createResolver(conf(indexedScratch()), () => false).resolve('sym:renamedAway')
 
     expect(result).toMatchObject({ status: 'missing', detail: 'symbol not found in the index' })
   })
@@ -109,7 +112,7 @@ describe('createResolver, with an index present', () => {
   test('reports a failed lookup as unverifiable, never as absent', () => {
     // A crashed or stale codegraph must not be able to fail the build with a false
     // "this symbol is gone" — silence is not evidence.
-    const result = createResolver(indexedScratch(), () => undefined).resolve('sym:applyCommand')
+    const result = createResolver(conf(indexedScratch()), () => undefined).resolve('sym:applyCommand')
 
     expect(result).toMatchObject({ status: 'unverifiable', detail: 'codegraph query failed' })
   })
@@ -117,7 +120,7 @@ describe('createResolver, with an index present', () => {
   test('passes the repo root and bare symbol name to the probe', () => {
     const seen: Array<readonly [string, string]> = []
     const root = indexedScratch()
-    createResolver(root, (r, n) => {
+    createResolver(conf(root), (r, n) => {
       seen.push([r, n])
       return true
     }).resolve('sym:Ruleset.tempoPerSquare')

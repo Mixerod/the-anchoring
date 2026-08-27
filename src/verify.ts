@@ -8,14 +8,13 @@
  */
 
 import {
-  HAZARD_CEILING,
-  HAZARD_OPEN_DAYS,
   HAZARD_RESOLUTIONS,
   LINK_FIELDS,
   kindOf,
 } from './model.js'
 import { loadStore, type Entity, type Store } from './store.js'
 import { createResolver, type Resolver } from './anchors.js'
+import type { AnchoringConfig } from './config.js'
 
 export type Severity = 'error' | 'warn'
 
@@ -33,7 +32,7 @@ export interface VerifyReport {
   readonly indexed: boolean
 }
 
-function checkRefs(entity: Entity, store: Store): readonly Finding[] {
+function checkRefs(entity: Entity, store: Store, config: AnchoringConfig): readonly Finding[] {
   const findings: Finding[] = []
   const spec = LINK_FIELDS[entity.kind]
 
@@ -44,7 +43,7 @@ function checkRefs(entity: Entity, store: Store): readonly Finding[] {
     for (const value of values) {
       const target = store.byId.get(value)
       if (!target) {
-        const known = kindOf(value)
+        const known = kindOf(config, value)
         findings.push({
           severity: 'error',
           where: `${entity.id} · ${field}`,
@@ -101,10 +100,14 @@ const DAY_MS = 86_400_000
  * The three constraints that make a hazard worth having, checked rather than described.
  *
  * Without a source it is a rumour; without a resolution it is a worry nobody owns; and
- * `open` past HAZARD_OPEN_DAYS warns, which `--strict` turns into a failed build. That
+ * `open` past hazard.openDays warns, which `--strict` turns into a failed build. That
  * escalation is the whole point of the kind — see ADR-0015.
  */
-function checkHazard(entity: Entity, now: Date): readonly Finding[] {
+function checkHazard(
+  entity: Entity,
+  now: Date,
+  hazardConfig: { readonly openDays: number; readonly ceiling: number },
+): readonly Finding[] {
   if (entity.kind !== 'HAZ' || entity.status !== 'active') return []
 
   const findings: Finding[] = []
@@ -176,11 +179,11 @@ function checkHazard(entity: Entity, now: Date): readonly Finding[] {
     })
   } else if (resolution === 'open' && recorded !== undefined && ISO_DAY.test(recorded)) {
     const days = Math.floor((now.getTime() - Date.parse(`${recorded}T00:00:00Z`)) / DAY_MS)
-    if (days > HAZARD_OPEN_DAYS) {
+    if (days > hazardConfig.openDays) {
       findings.push({
         severity: 'warn',
         where: at('resolution'),
-        message: `has been open for ${days} days (limit ${HAZARD_OPEN_DAYS})`,
+        message: `has been open for ${days} days (limit ${hazardConfig.openDays})`,
         hint: 'guard it with an INV- and a checker, or record it as accepted/not-applicable with a reason',
       })
     }
@@ -257,23 +260,23 @@ function checkSupersession(entity: Entity, store: Store): readonly Finding[] {
       ]
 }
 
-function checkHazardCeiling(store: Store): readonly Finding[] {
+function checkHazardCeiling(store: Store, ceiling: number): readonly Finding[] {
   const active = [...store.byId.values()].filter((e) => e.kind === 'HAZ' && e.status === 'active')
-  return active.length <= HAZARD_CEILING
+  return active.length <= ceiling
     ? []
     : [
         {
           severity: 'error',
           where: 'hazards',
-          message: `${active.length} active hazards, ceiling is ${HAZARD_CEILING}`,
+          message: `${active.length} active hazards, ceiling is ${ceiling}`,
           hint: 'promote one to an INV- with a real checker, or retire it — the ceiling is what keeps this list read',
         },
       ]
 }
 
-export function verify(root: string, now: Date = new Date()): VerifyReport {
-  const store = loadStore(root)
-  const resolver = createResolver(root)
+export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyReport {
+  const store = loadStore(config)
+  const resolver = createResolver(config)
 
   const findings: Finding[] = store.problems.map((p) => ({
     severity: 'error' as const,
@@ -283,16 +286,16 @@ export function verify(root: string, now: Date = new Date()): VerifyReport {
 
   let anchorCount = 0
   for (const entity of store.byId.values()) {
-    findings.push(...checkRefs(entity, store))
+    findings.push(...checkRefs(entity, store, config))
     findings.push(...checkSupersession(entity, store))
     findings.push(...checkGovernsSomething(entity))
-    findings.push(...checkHazard(entity, now))
+    findings.push(...checkHazard(entity, now, config.hazard))
     const anchors = checkAnchors(entity, resolver)
     findings.push(...anchors.findings)
     anchorCount += anchors.count
   }
 
-  findings.push(...checkHazardCeiling(store))
+  findings.push(...checkHazardCeiling(store, config.hazard.ceiling))
 
   return { findings, entityCount: store.byId.size, anchorCount, indexed: resolver.indexed }
 }

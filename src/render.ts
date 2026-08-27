@@ -113,7 +113,7 @@ export function renderCtx(report: CtxReport, c: Palette = COLOUR): string {
   if (!subject) {
     return (
       `${c.yellow}No work item \`${report.query}\`.${c.off}\n` +
-      `${c.dim}Create .dicebound/work/${report.query}.md before starting, so the change and\n` +
+      `${c.dim}Create ${report.workDir ?? '.anchor/work'}/${report.query}.md before starting, so the change and\n` +
       `the reason for it land in the same commit.${c.off}`
     )
   }

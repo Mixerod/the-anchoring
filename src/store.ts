@@ -9,8 +9,9 @@
 
 import { readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-import { KIND_SPEC, LINK_FIELDS, SCALAR_FIELDS, kindOf, type EntityKind } from './model.js'
+import { ENTITY_KINDS, LINK_FIELDS, SCALAR_FIELDS, kindOf, type EntityKind } from './model.js'
 import { readFrontmatter, toList } from './frontmatter.js'
+import type { AnchoringConfig } from './config.js'
 
 export interface Entity {
   readonly id: string
@@ -56,23 +57,24 @@ function listMarkdown(dir: string): readonly string[] {
     .filter((p) => statSync(p).isFile())
 }
 
-function readEntity(root: string, path: string, expected: EntityKind): Entity | LoadProblem {
-  const rel = relative(root, path).split(sep).join('/')
+function readEntity(config: AnchoringConfig, path: string, expected: EntityKind): Entity | LoadProblem {
+  const rel = relative(config.root, path).split(sep).join('/')
   const parsed = readFrontmatter(path)
   if (!parsed.ok) return { path: rel, message: parsed.reason }
 
   const { data } = parsed
   const id = typeof data['id'] === 'string' ? data['id'] : ''
   if (!id) return { path: rel, message: 'frontmatter is missing `id`' }
-  if (kindOf(id) !== expected) {
+  if (kindOf(config, id) !== expected) {
     return { path: rel, message: `id \`${id}\` does not match the ${expected} id pattern` }
   }
 
   const status = typeof data['status'] === 'string' ? data['status'] : ''
-  if (!KIND_SPEC[expected].statuses.includes(status)) {
+  const kindSpec = config.kinds[expected]
+  if (!kindSpec.statuses.includes(status)) {
     return {
       path: rel,
-      message: `status \`${status}\` is not one of: ${KIND_SPEC[expected].statuses.join(', ')}`,
+      message: `status \`${status}\` is not one of: ${kindSpec.statuses.join(', ')}`,
     }
   }
 
@@ -94,13 +96,14 @@ function readEntity(root: string, path: string, expected: EntityKind): Entity | 
   return { id, kind: expected, title, status, path: rel, links, fields }
 }
 
-export function loadStore(root: string): Store {
+export function loadStore(config: AnchoringConfig): Store {
   const byId = new Map<string, Entity>()
   const problems: LoadProblem[] = []
 
-  for (const kind of Object.keys(KIND_SPEC) as EntityKind[]) {
-    for (const path of listMarkdown(join(root, KIND_SPEC[kind].dir))) {
-      const result = readEntity(root, path, kind)
+  for (const kind of ENTITY_KINDS) {
+    const kindSpec = config.kinds[kind]
+    for (const path of listMarkdown(join(config.root, kindSpec.dir))) {
+      const result = readEntity(config, path, kind)
       if ('message' in result) {
         problems.push(result)
         continue

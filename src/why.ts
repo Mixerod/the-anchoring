@@ -12,6 +12,7 @@
 import { EDGE_PHRASE, LINK_FIELDS } from './model.js'
 import { loadStore, type Entity } from './store.js'
 import { parseAnchor } from './anchors.js'
+import type { AnchoringConfig } from './config.js'
 
 export interface Mention {
   readonly entity: Entity
@@ -65,8 +66,8 @@ function findMentions(query: string, entities: readonly Entity[]): readonly Ment
   return mentions
 }
 
-export function why(root: string, query: string): WhyReport {
-  const store = loadStore(root)
+export function why(config: AnchoringConfig, query: string): WhyReport {
+  const store = loadStore(config)
   const entities = [...store.byId.values()]
   const subject = store.byId.get(query)
 

@@ -11,14 +11,11 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import type { AnchoringConfig } from './config.js'
 
-const SESSION_FILE = '.dicebound/session/current'
-
-const WORK_ID = /^W-\d+$/
-
-export function rememberWork(root: string, workId: string): void {
-  if (!WORK_ID.test(workId)) return
-  const path = join(root, SESSION_FILE)
+export function rememberWork(config: AnchoringConfig, workId: string): void {
+  if (!config.kinds.WORK.idPattern.test(workId)) return
+  const path = join(config.root, config.sessionFile)
   try {
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, `${workId}\n`)
@@ -28,12 +25,12 @@ export function rememberWork(root: string, workId: string): void {
   }
 }
 
-export function recallWork(root: string): string | undefined {
-  const path = join(root, SESSION_FILE)
+export function recallWork(config: AnchoringConfig): string | undefined {
+  const path = join(config.root, config.sessionFile)
   if (!existsSync(path)) return undefined
   try {
     const value = readFileSync(path, 'utf8').trim()
-    return WORK_ID.test(value) ? value : undefined
+    return config.kinds.WORK.idPattern.test(value) ? value : undefined
   } catch {
     return undefined
   }

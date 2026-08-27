@@ -136,7 +136,7 @@ describe('renderCtx', () => {
   test('tells the agent what to create when the work item does not exist', () => {
     const text = renderCtx({ ...base, query: 'W-404' }, PLAIN)
 
-    expect(text).toContain('.dicebound/work/W-404.md')
+    expect(text).toContain('.anchor/work/W-404.md')
   })
 
   test('renders a section entry with its title, path, and the link it came through', () => {

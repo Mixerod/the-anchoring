@@ -9,44 +9,10 @@
  * See docs/adr/0013-knowledge-base-and-retrieval.md and docs/adr/0015-hazards-external-failure-modes.md.
  */
 
+import type { AnchoringConfig } from './config.js'
+
 export const ENTITY_KINDS = ['ADR', 'INV', 'FLOW', 'WORK', 'INC', 'HAZ'] as const
 export type EntityKind = (typeof ENTITY_KINDS)[number]
-
-/** Where each kind lives, and the id shape it must use. */
-export const KIND_SPEC: Readonly<
-  Record<EntityKind, { readonly dir: string; readonly idPattern: RegExp; readonly statuses: readonly string[] }>
-> = {
-  ADR: {
-    dir: 'docs/adr',
-    idPattern: /^ADR-\d{4}$/,
-    statuses: ['proposed', 'accepted', 'superseded', 'void'],
-  },
-  INV: {
-    dir: '.dicebound/invariant',
-    idPattern: /^INV-[A-Z0-9-]+$/,
-    statuses: ['active', 'retired'],
-  },
-  FLOW: {
-    dir: '.dicebound/flow',
-    idPattern: /^FLOW-\d{4}$/,
-    statuses: ['draft', 'live', 'retired'],
-  },
-  WORK: {
-    dir: '.dicebound/work',
-    idPattern: /^W-\d+$/,
-    statuses: ['todo', 'doing', 'review', 'done', 'dropped'],
-  },
-  INC: {
-    dir: '.dicebound/incident',
-    idPattern: /^INC-\d{4}$/,
-    statuses: ['open', 'fixed', 'wontfix'],
-  },
-  HAZ: {
-    dir: '.dicebound/hazard',
-    idPattern: /^HAZ-\d{4}$/,
-    statuses: ['active', 'retired'],
-  },
-}
 
 /**
  * A link field either points at other entities (`to`) or at code (`anchor`).
@@ -116,15 +82,6 @@ export const SCALAR_FIELDS: Readonly<Record<EntityKind, readonly string[]>> = {
 export const HAZARD_RESOLUTIONS = ['guarded', 'accepted', 'not-applicable', 'open'] as const
 export type HazardResolution = (typeof HAZARD_RESOLUTIONS)[number]
 
-export const HAZARD_OPEN_DAYS = 30
-
-/**
- * A hard ceiling, not a guideline. An unbounded catalogue of things that went wrong
- * elsewhere becomes a graveyard, and nobody reads a graveyard. The 25th hazard has to
- * displace one of the 24 by promoting it to an `INV-` with a real checker.
- */
-export const HAZARD_CEILING = 24
-
 /** Human-readable phrasing for `kb why`, so output reads as sentences not field names. */
 export const EDGE_PHRASE: Readonly<Record<string, string>> = {
   governs: 'is governed by',
@@ -135,6 +92,6 @@ export const EDGE_PHRASE: Readonly<Record<string, string>> = {
   touches: 'was touched by',
 }
 
-export function kindOf(id: string): EntityKind | undefined {
-  return ENTITY_KINDS.find((k) => KIND_SPEC[k].idPattern.test(id))
+export function kindOf(config: AnchoringConfig, id: string): EntityKind | undefined {
+  return ENTITY_KINDS.find((k) => config.kinds[k].idPattern.test(id))
 }

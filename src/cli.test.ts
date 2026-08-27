@@ -99,7 +99,7 @@ const WORK = fixture({
   'docs/adr/0003-tempo.md':
     '---\nid: ADR-0003\ntitle: Tempo Pool\nstatus: accepted\n' +
     'governs:\n  - file:packages/core/src/tempo\n---\n',
-  '.dicebound/work/W-112.md':
+  '.anchor/work/W-112.md':
     '---\nid: W-112\ntitle: Tune knight leap cost\nstatus: doing\n' +
     'implements:\n  - ADR-0003\n---\n',
 })

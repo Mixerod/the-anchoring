@@ -32,7 +32,7 @@ function invoke(argv: readonly string[], root: string, files: readonly string[] 
 }
 
 const withWork = (id: string, status = 'doing') =>
-  fixture({ [`.dicebound/work/${id}.md`]: doc({ id, title: 'Remembered work', status }) })
+  fixture({ [`.anchor/work/${id}.md`]: doc({ id, title: 'Remembered work', status }) })
 
 describe('kb done, with no id given', () => {
   test('exits 2 with usage when nothing has been claimed', () => {
@@ -78,8 +78,8 @@ describe('kb done, with no id given', () => {
 
   test('an explicit id still wins over the remembered one', () => {
     const root = fixture({
-      '.dicebound/work/W-77.md': doc({ id: 'W-77', title: 'Remembered', status: 'doing' }),
-      '.dicebound/work/W-88.md': doc({ id: 'W-88', title: 'Explicit', status: 'doing' }),
+      '.anchor/work/W-77.md': doc({ id: 'W-77', title: 'Remembered', status: 'doing' }),
+      '.anchor/work/W-88.md': doc({ id: 'W-88', title: 'Explicit', status: 'doing' }),
     })
     invoke(['ctx', 'W-77'], root)
 
