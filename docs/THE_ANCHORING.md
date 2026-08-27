@@ -134,6 +134,34 @@ embedding model.
 An invariant that matters is enforced by a program, not described in a paragraph. Prose is
 followed roughly 70% of the time — fine for style, useless for an invariant.
 
+### 6. The upstream loop
+
+A pattern used in more than one repository accumulates defects that are only ever visible
+downstream. The upstream repository never sees them: it has no user but itself, and the
+project that hit the defect has no channel that outlives the session in which it was hit.
+So the knowledge dies where it was earned — the same failure this whole pattern exists to
+stop, one level up.
+
+A bug tracker records what somebody remembered to report. A tool with gates knows something
+stronger: **when its own gate ran and stayed silent.** That absence is invisible to every
+other mechanism, and it is the highest-value evidence that the tool, not the project, is at
+fault.
+
+So attribution runs on **closed evidence classes**, and the default verdict is `local`. An
+incident is the project's fault until machine-checkable evidence says otherwise. The reason
+to state that so plainly is that the failure mode is asymmetric: an agent asked *is this the
+tool's fault?* says yes far more often than the truth warrants, and an attribution mechanism
+that cannot say **no** reports noise until somebody switches it off. A closed list with a
+default is where judgment stops drifting.
+
+It generalises, and that is the point. `upstream:` names any package, not this one. A
+company with five internal shared libraries gets the same loop for each of them at no extra
+cost — the tool is not building itself a private complaints department.
+
+**No network, ever.** The tool writes a document; a person reads it and decides whether to
+send it. That is a deliberate limit, not an unfinished feature: an automatic channel from a
+private repository to an upstream project is a data-exfiltration path with a friendly name.
+
 ---
 
 ## The four commands
@@ -207,6 +235,7 @@ If three cannot produce a real checker between them, the idea is wrong and it co
 5. **Only source code is chased for "nobody explained this".** Use an allowlist
    (`packages/`, `apps/`, `src/`), not a denylist — otherwise every new config file
    reappears as a false finding and the check gets ignored.
+6. **An incident blamed upstream carries machine-checkable evidence, or it is local.**
 
 ---
 
