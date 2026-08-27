@@ -77,7 +77,7 @@ export {
 } from './owners.js'
 
 // Repository root & Config loading
-export { findRepoRoot, loadConfig } from './root.js'
+export { findRepoRoot, loadConfig, realPath } from './root.js'
 
 // Store & Loading
 export { parseEntity, buildStore, type Entity, type Store, type LoadProblem } from './store.js'
@@ -183,4 +183,4 @@ export {
 export { runUpstream, readPackageFacts, readExistingReports } from './cli-upstream.js'
 
 // CLI runner
-export { run } from './cli.js'
+export { run, isDirectlyInvoked } from './cli.js'

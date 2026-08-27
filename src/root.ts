@@ -6,9 +6,24 @@
  * resolves to the nearest sub-project.
  */
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { parseConfig, defaultConfig, type ConfigResult } from './config.js'
+
+/**
+ * A path with every symlink resolved, falling back to the path itself when it cannot be.
+ *
+ * Lives here rather than in `cli.ts` because this is a declared I/O module and `cli.ts` is
+ * not; `cli.ts` takes it as an argument, like every other I/O boundary in this codebase.
+ */
+/* c8 ignore next 7 */
+export const realPath = (path: string): string => {
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
+  }
+}
 
 export function findRepoRoot(startDir: string): string | undefined {
   // Pass 1: look for anchoring.config.json

@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { run } from './cli.js'
+import { dirname, join, resolve } from 'node:path'
+import { isDirectlyInvoked, run } from './cli.js'
 import { parseChangedFiles } from './git.js'
 
 function fixture(docs: Readonly<Record<string, string>>): string {
@@ -179,5 +179,48 @@ describe('parseChangedFiles (T13d)', () => {
 
   test('two empty outputs are an empty list, not a list with one empty string', () => {
     expect(parseChangedFiles('', '')).toEqual([])
+  })
+})
+
+describe('isDirectlyInvoked (INC-0002: the CLI that exited 0 having done nothing)', () => {
+  const MODULE = resolve('/repo/dist/cli.js')
+
+  test('true when argv[1] is literally this module', () => {
+    expect(isDirectlyInvoked(MODULE, MODULE, (p) => p)).toBe(true)
+  })
+
+  test('true when argv[1] is a symlink into this module — the case that was broken', () => {
+    // What a package manager actually produces: node_modules/<pkg> is a link, and Node
+    // resolves `import.meta.url` to the real file. The literal comparison fails here, and
+    // the CLI silently exited 0 having checked nothing.
+    const link = resolve('/adopter/node_modules/the-anchoring/dist/cli.js')
+    const realpath = (p: string) => (p === link ? MODULE : p)
+
+    expect(isDirectlyInvoked(link, MODULE, realpath)).toBe(true)
+  })
+
+  test('false when argv[1] is a different program, symlinks resolved', () => {
+    expect(isDirectlyInvoked(resolve('/repo/dist/other.js'), MODULE, (p) => p)).toBe(false)
+  })
+
+  test('false when there is no argv[1] at all', () => {
+    expect(isDirectlyInvoked(undefined, MODULE, (p) => p)).toBe(false)
+    expect(isDirectlyInvoked('', MODULE, (p) => p)).toBe(false)
+  })
+
+  test('the literal match short-circuits, so realpath is not consulted at all', () => {
+    let calls = 0
+    const counting = (p: string): string => {
+      calls += 1
+      return p
+    }
+    expect(isDirectlyInvoked(MODULE, MODULE, counting)).toBe(true)
+    expect(calls).toBe(0)
+  })
+
+  test('realPath itself swallows an unresolvable path rather than throwing', async () => {
+    const { realPath } = await import('./root.js')
+    const missing = resolve('/definitely/not/here/cli.js')
+    expect(realPath(missing)).toBe(missing)
   })
 })

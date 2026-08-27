@@ -13,7 +13,7 @@
 
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { findRepoRoot, loadConfig } from './root.js'
+import { findRepoRoot, loadConfig, realPath } from './root.js'
 import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type InitPlan } from './init.js'
 import { planGuards, checkGuards } from './guards.js'
 import { updateAgentsMd } from './agents.js'
@@ -26,6 +26,34 @@ import { COLOUR, PLAIN, USAGE, renderCtx, renderDone, renderUnclaimed, renderVer
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
 import { runUpstream } from './cli-upstream.js'
+
+/**
+ * Whether this module is the program being run, rather than a module being imported.
+ *
+ * Comparing `resolve(argv[1])` to `fileURLToPath(import.meta.url)` is the obvious version
+ * and it is wrong the moment the package is *installed* rather than run from its own
+ * checkout. A package manager puts `node_modules/<pkg>` there as a symlink (pnpm always;
+ * npm for a `link:` or `file:` dependency), and Node resolves an ESM module specifier to
+ * its **real** path — so `import.meta.url` is the checkout while `argv[1]` is the link, the
+ * two never match, and the CLI silently does nothing and exits 0. A gate that exits 0
+ * having checked nothing is worse than one that fails: CI goes green on an empty run.
+ *
+ * INC-0002 in the first adopter's repository: `pnpm kb verify --strict` printed no output
+ * and exited 0 against a 107-entity corpus. `the-anchoring` never saw it because it runs
+ * itself through `tsx src/cli.ts`, where the two paths are the same file.
+ *
+ * So: compare real paths, and fall back to the literal comparison when the path cannot be
+ * resolved — a missing file is not a reason to refuse to run.
+ */
+export function isDirectlyInvoked(
+  argv1: string | undefined,
+  moduleFile: string,
+  realpath: (p: string) => string = realPath,
+): boolean {
+  if (!argv1) return false
+  const invoked = resolve(argv1)
+  return invoked === moduleFile || realpath(invoked) === realpath(moduleFile)
+}
 
 export function run(
   argv: readonly string[],
@@ -303,8 +331,7 @@ const write =
     stream.write(`${text}\n`)
   }
 
-const invokedAs = process.argv[1] ? resolve(process.argv[1]) : ''
-if (invokedAs === fileURLToPath(import.meta.url)) {
+if (isDirectlyInvoked(process.argv[1], fileURLToPath(import.meta.url))) {
   process.exit(run(process.argv.slice(2), write(process.stdout), write(process.stderr)))
 }
 /* c8 ignore stop */
