@@ -260,6 +260,26 @@ function checkSupersession(entity: Entity, store: Store): readonly Finding[] {
       ]
 }
 
+const OWNER_SHAPED = /^(@[a-zA-Z0-9_.-]+|team:[a-zA-Z0-9_.-]+)$/
+
+function checkOwner(entity: Entity): readonly Finding[] {
+  const owner = entity.fields['owner']
+  if (owner === undefined) return []
+
+  const trimmed = owner.trim()
+  if (!OWNER_SHAPED.test(trimmed)) {
+    return [
+      {
+        severity: 'error',
+        where: `${entity.id} · owner`,
+        message: `\`${owner}\` must be shaped \`@handle\` or \`team:<name>\``,
+        hint: 'an ownership field that accepts anything identifies nobody',
+      },
+    ]
+  }
+  return []
+}
+
 function checkHazardCeiling(store: Store, ceiling: number): readonly Finding[] {
   const active = [...store.byId.values()].filter((e) => e.kind === 'HAZ' && e.status === 'active')
   return active.length <= ceiling
@@ -290,6 +310,7 @@ export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyR
     findings.push(...checkSupersession(entity, store))
     findings.push(...checkGovernsSomething(entity))
     findings.push(...checkHazard(entity, now, config.hazard))
+    findings.push(...checkOwner(entity))
     const anchors = checkAnchors(entity, resolver)
     findings.push(...anchors.findings)
     anchorCount += anchors.count

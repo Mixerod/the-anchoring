@@ -54,6 +54,18 @@ export {
   type UpdateAgentsResult,
 } from './agents.js'
 
+// Owners (Layer 3)
+export {
+  resolveOwners,
+  resolveOwnerForPath,
+  renderCodeowners,
+  planOwners,
+  OWNERS_START_MARKER,
+  OWNERS_END_MARKER,
+  type OwnershipMapping,
+  type OwnersReport,
+} from './owners.js'
+
 // Repository root
 export { findRepoRoot } from './root.js'
 

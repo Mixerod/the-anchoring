@@ -18,6 +18,7 @@ import { loadConfig } from './config.js'
 import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type InitPlan } from './init.js'
 import { planGuards, checkGuards } from './guards.js'
 import { updateAgentsMd } from './agents.js'
+import { planOwners } from './owners.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
@@ -240,6 +241,49 @@ export function run(
       for (const note of plan.notes) {
         out(`\n${note}`)
       }
+      return 0
+    }
+
+    case 'owners': {
+      const probe = defaultFsProbe(config.root)
+      const io = defaultInitIo(config.root)
+      const targetPath = probe('.github') ? '.github/CODEOWNERS' : 'CODEOWNERS'
+      const existing = io.readFile(targetPath)
+      const report = planOwners(config, probe, existing)
+
+      if (rest.includes('--check')) {
+        if (report.mappings.length === 0) {
+          out('CODEOWNERS: ok (no owners declared)')
+          return 0
+        }
+        if (existing === undefined) {
+          out(`${report.targetFile}: missing`)
+          return 1
+        }
+        if (existing !== report.renderedContent) {
+          out(`${report.targetFile}: stale`)
+          return 1
+        }
+        out(`${report.targetFile}: ok`)
+        return 0
+      }
+
+      if (report.mappings.length === 0) {
+        out('kb owners: no owners declared in any entity.')
+        return 0
+      }
+
+      out('Path                           Owner       Via')
+      out('------------------------------ ----------- --------')
+      for (const m of report.mappings) {
+        out(`${m.path.padEnd(30)} ${m.owner.padEnd(11)} ${m.via}`)
+      }
+      for (const note of report.notes) {
+        out(note)
+      }
+
+      io.writeFile(report.targetFile, report.renderedContent)
+      out(`\nkb owners: wrote ${report.targetFile}`)
       return 0
     }
 

@@ -12,6 +12,7 @@
 import { EDGE_PHRASE, LINK_FIELDS } from './model.js'
 import { loadStore, type Entity } from './store.js'
 import { parseAnchor } from './anchors.js'
+import { resolveOwnerForPath } from './owners.js'
 import type { AnchoringConfig } from './config.js'
 
 export interface Mention {
@@ -35,6 +36,7 @@ export interface WhyReport {
   readonly mentions: readonly Mention[]
   readonly outgoing: readonly { readonly field: string; readonly target: Entity }[]
   readonly incoming: readonly { readonly field: string; readonly source: Entity }[]
+  readonly owner?: { readonly owner: string; readonly via: string }
 }
 
 /** A file anchor matches its own path and any path beneath it, so a directory works too. */
@@ -80,7 +82,14 @@ export function why(config: AnchoringConfig, query: string): WhyReport {
   const subject = store.byId.get(query)
 
   if (!subject) {
-    return { query, mentions: findMentions(query, entities), outgoing: [], incoming: [] }
+    const owner = resolveOwnerForPath(query, entities)
+    return {
+      query,
+      mentions: findMentions(query, entities),
+      outgoing: [],
+      incoming: [],
+      ...(owner ? { owner } : {}),
+    }
   }
 
   const spec = LINK_FIELDS[subject.kind]

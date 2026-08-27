@@ -1,0 +1,180 @@
+/**
+ * Ownership projection from the intent graph into CODEOWNERS.
+ *
+ * Walks every entity with an `owner:` field and projects ownership
+ * out of the graph onto file paths.
+ */
+
+import { loadStore, type Entity } from './store.js'
+import type { AnchoringConfig } from './config.js'
+
+export const OWNERS_START_MARKER = '<!-- kb:owners:start -->'
+export const OWNERS_END_MARKER = '<!-- kb:owners:end -->'
+
+export interface OwnershipMapping {
+  readonly path: string
+  readonly owner: string
+  readonly via: string
+}
+
+export interface OwnersReport {
+  readonly mappings: readonly OwnershipMapping[]
+  readonly notes: readonly string[]
+  readonly targetFile: string
+  readonly renderedContent: string
+}
+
+function normaliseAnchorPath(path: string): string {
+  return path.split('\\').join('/').replace(/^\.\//, '')
+}
+
+export function resolveOwners(entities: readonly Entity[]): {
+  readonly mappings: readonly OwnershipMapping[]
+  readonly notes: readonly string[]
+} {
+  const claimsByPath = new Map<string, { owner: string; via: string }[]>()
+  const notes: string[] = []
+
+  for (const entity of entities) {
+    const owner = entity.fields['owner']
+    if (!owner) continue
+
+    for (const values of Object.values(entity.links)) {
+      for (const raw of values) {
+        if (raw.startsWith('file:')) {
+          const path = normaliseAnchorPath(raw.slice('file:'.length))
+          const existing = claimsByPath.get(path) ?? []
+          existing.push({ owner: owner.trim(), via: entity.id })
+          claimsByPath.set(path, existing)
+        }
+      }
+    }
+  }
+
+  const mappings: OwnershipMapping[] = []
+
+  // Check for exact duplicates or overlaps
+  const sortedPaths = [...claimsByPath.keys()].sort()
+
+  for (const path of sortedPaths) {
+    const claims = claimsByPath.get(path) ?? []
+    if (claims.length === 0) continue
+
+    const winner = claims[0]
+    if (!winner) continue
+
+    if (claims.length > 1) {
+      for (let i = 1; i < claims.length; i++) {
+        const loser = claims[i]
+        if (loser) {
+          notes.push(
+            `note: multiple entities claim \`${path}\`: \`${winner.via}\` (${winner.owner}) wins over \`${loser.via}\` (${loser.owner})`,
+          )
+        }
+      }
+    }
+
+    mappings.push({ path, owner: winner.owner, via: winner.via })
+  }
+
+  // Check for prefix overlaps (longest match)
+  for (let i = 0; i < mappings.length; i++) {
+    const a = mappings[i]
+    if (!a) continue
+    for (let j = 0; j < mappings.length; j++) {
+      if (i === j) continue
+      const b = mappings[j]
+      if (!b) continue
+      if (a.path.startsWith(b.path) && a.path !== b.path) {
+        notes.push(
+          `note: \`${a.via}\` (${a.owner}) on \`${a.path}\` takes precedence over broader claim \`${b.via}\` (${b.owner}) on \`${b.path}\``,
+        )
+      }
+    }
+  }
+
+  return { mappings, notes }
+}
+
+export function resolveOwnerForPath(
+  path: string,
+  entities: readonly Entity[],
+): { readonly owner: string; readonly via: string } | undefined {
+  const normalised = normaliseAnchorPath(path)
+  const matchingClaims: { owner: string; via: string; matchLength: number }[] = []
+
+  for (const entity of entities) {
+    const owner = entity.fields['owner']
+    if (!owner) continue
+
+    for (const values of Object.values(entity.links)) {
+      for (const raw of values) {
+        if (raw.startsWith('file:')) {
+          const anchorPath = normaliseAnchorPath(raw.slice('file:'.length))
+          let matched = false
+          if (anchorPath === normalised) {
+            matched = true
+          } else if (anchorPath.endsWith('/')) {
+            matched = normalised.startsWith(anchorPath)
+          } else if (normalised.startsWith(`${anchorPath}/`)) {
+            matched = true
+          }
+
+          if (matched) {
+            matchingClaims.push({
+              owner: owner.trim(),
+              via: entity.id,
+              matchLength: anchorPath.length,
+            })
+          }
+        }
+      }
+    }
+  }
+
+  if (matchingClaims.length === 0) return undefined
+
+  matchingClaims.sort((a, b) => b.matchLength - a.matchLength)
+  const top = matchingClaims[0]
+  return top ? { owner: top.owner, via: top.via } : undefined
+}
+
+export function renderCodeowners(
+  mappings: readonly OwnershipMapping[],
+  existingContent?: string,
+): string {
+  const lines = mappings.map((m) => `${m.path.padEnd(30)} ${m.owner}`)
+  const block = `${OWNERS_START_MARKER}\n${lines.join('\n')}\n${OWNERS_END_MARKER}`
+
+  if (
+    existingContent &&
+    existingContent.includes(OWNERS_START_MARKER) &&
+    existingContent.includes(OWNERS_END_MARKER)
+  ) {
+    const startIdx = existingContent.indexOf(OWNERS_START_MARKER)
+    const endIdx = existingContent.indexOf(OWNERS_END_MARKER) + OWNERS_END_MARKER.length
+    return existingContent.slice(0, startIdx) + block + existingContent.slice(endIdx)
+  }
+
+  return `# CODEOWNERS\n# Generated by \`kb owners\`\n\n${block}\n`
+}
+
+export function planOwners(
+  config: AnchoringConfig,
+  probe: (relPath: string) => boolean,
+  existingContent?: string,
+): OwnersReport {
+  const store = loadStore(config)
+  const entities = [...store.byId.values()]
+  const { mappings, notes } = resolveOwners(entities)
+
+  const targetFile = probe('.github') ? '.github/CODEOWNERS' : 'CODEOWNERS'
+  const renderedContent = renderCodeowners(mappings, existingContent)
+
+  return {
+    mappings,
+    notes,
+    targetFile,
+    renderedContent,
+  }
+}

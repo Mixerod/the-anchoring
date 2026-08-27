@@ -92,13 +92,17 @@ export function renderWhy(report: WhyReport, c: Palette = COLOUR): string {
     )
   }
 
-  return [
+  const lines = [
     `${c.bold}${report.query}${c.off}`,
     ...report.mentions.flatMap((m) => [
       `  ${m.entity.id.padEnd(10)} ${m.phrase.padEnd(16)} ${c.dim}${m.matched}${c.off}`,
       `  ${' '.repeat(10)} ${m.entity.title} ${c.dim}(${m.entity.status}, ${m.entity.path})${c.off}`,
     ]),
-  ].join('\n')
+  ]
+  if (report.owner) {
+    lines.push(`  ${c.dim}owner: ${report.owner.owner} (via ${report.owner.via})${c.off}`)
+  }
+  return lines.join('\n')
 }
 
 export const USAGE =
@@ -106,7 +110,9 @@ export const USAGE =
   '  kb ctx <W-id>          everything that bears on a piece of work, before you start\n' +
   '  kb why <target>        what a file, symbol, or entity is for\n' +
   '  kb done <W-id>         what still needs recording, before you finish\n' +
-  '  kb verify [--strict]   check every claim the docs make about the code\n'
+  '  kb verify [--strict]   check every claim the docs make about the code\n' +
+  '  kb guards [--check]    generate checkers from the architecture matrix\n' +
+  '  kb owners [--check]    project ownership into CODEOWNERS\n'
 
 export function renderCtx(report: CtxReport, c: Palette = COLOUR): string {
   const { subject } = report

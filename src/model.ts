@@ -64,10 +64,10 @@ export const LINK_FIELDS: Readonly<Record<EntityKind, Readonly<Record<string, Li
  * change, and `store.ts` never learns what a hazard is.
  */
 export const SCALAR_FIELDS: Readonly<Record<EntityKind, readonly string[]>> = {
-  ADR: ['governs_nothing'],
-  INV: [],
+  ADR: ['governs_nothing', 'owner'],
+  INV: ['owner'],
   FLOW: [],
-  WORK: [],
+  WORK: ['owner'],
   INC: [],
   HAZ: ['source', 'observed', 'recorded', 'resolution', 'reason'],
 }
