@@ -11,7 +11,8 @@
  */
 
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
+import { findRepoRoot } from './root.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
@@ -20,15 +21,19 @@ import { COLOUR, PLAIN, USAGE, renderCtx, renderDone, renderUnclaimed, renderVer
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
 
-const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
-
 export function run(
   argv: readonly string[],
   out: (text: string) => void,
   err: (text: string) => void,
-  root: string = REPO_ROOT,
+  root?: string,
   changedFiles: ChangedFiles = gitChangedFiles,
 ): number {
+  const resolvedRoot = root ?? findRepoRoot(process.cwd())
+  if (!resolvedRoot) {
+    err('kb: not inside a repository. Run `kb init` at the root of your project first.')
+    return 2
+  }
+
   const [command, ...rest] = argv
   const palette = rest.includes('--no-colour') ? PLAIN : COLOUR
   const positional = rest.find((a) => !a.startsWith('-'))
@@ -39,9 +44,9 @@ export function run(
         err('usage: kb ctx <W-id>')
         return 2
       }
-      const report = ctx(root, positional)
+      const report = ctx(resolvedRoot, positional)
       // Leave a note for the Stop hook, so `kb done` needs no argument later.
-      if (report.subject) rememberWork(root, positional)
+      if (report.subject) rememberWork(resolvedRoot, positional)
       out(renderCtx(report, palette))
       return report.subject ? 0 : 1
     }
@@ -49,14 +54,14 @@ export function run(
     case 'done': {
       // With no id, fall back to whatever `kb ctx` last opened. That is what lets the
       // Stop hook run `kb done --check` with no knowledge of the task.
-      const workId = positional ?? recallWork(root)
+      const workId = positional ?? recallWork(resolvedRoot)
       if (!workId) {
         // Nothing was claimed. Silence is still correct for a diff of docs, config or the
         // knowledge base — a hook that scolds on every unrelated turn gets switched off.
         // But INC-0001 showed that the same silence let six source files land in `apps/`
         // with no gate saying a word, because opening no work item bypassed everything.
         // So: speak when the diff touches governed code, and never fail the turn for it.
-        const unclaimed = unclaimedWork(changedFiles, root)
+        const unclaimed = unclaimedWork(changedFiles, resolvedRoot)
         if (rest.includes('--check')) {
           if (unclaimed) out(renderUnclaimed(unclaimed, palette))
           return 0
@@ -64,14 +69,14 @@ export function run(
         err('usage: kb done <W-id> [--check]')
         return 2
       }
-      const report = done(root, workId, changedFiles)
+      const report = done(resolvedRoot, workId, changedFiles)
       out(renderDone(report, palette))
       // --check is the hook mode: report the gaps, never fail the agent's turn over them.
       return report.gaps.length > 0 && !rest.includes('--check') ? 1 : 0
     }
 
     case 'verify': {
-      const report = verify(root)
+      const report = verify(resolvedRoot)
       out(renderVerify(report, palette))
       const errors = report.findings.filter((f) => f.severity === 'error').length
       const warnings = report.findings.length - errors
@@ -83,7 +88,7 @@ export function run(
         err('usage: kb why <file|symbol|entity-id>')
         return 2
       }
-      out(renderWhy(why(root, positional), palette))
+      out(renderWhy(why(resolvedRoot, positional), palette))
       return 0
     }
 
