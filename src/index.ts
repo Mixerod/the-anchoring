@@ -44,6 +44,16 @@ export {
   type GuardCheckResult,
 } from './guards.js'
 
+// Agents brief (Layer 3)
+export {
+  generateArchitectureSection,
+  renderAgentsMd,
+  updateAgentsMd,
+  ARCH_START_MARKER,
+  ARCH_END_MARKER,
+  type UpdateAgentsResult,
+} from './agents.js'
+
 // Repository root
 export { findRepoRoot } from './root.js'
 

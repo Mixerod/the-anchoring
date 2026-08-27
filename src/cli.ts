@@ -17,6 +17,7 @@ import { findRepoRoot } from './root.js'
 import { loadConfig } from './config.js'
 import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type InitPlan } from './init.js'
 import { planGuards, checkGuards } from './guards.js'
+import { updateAgentsMd } from './agents.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
@@ -205,12 +206,36 @@ export function run(
             allOk = false
           }
         }
+        const existingAgents = io.readFile('AGENTS.md')
+        if (existingAgents !== undefined) {
+          const agentsRes = updateAgentsMd(existingAgents, config.architecture)
+          if (agentsRes.updated) {
+            if (agentsRes.content !== existingAgents) {
+              out('AGENTS.md: stale')
+              allOk = false
+            } else {
+              out('AGENTS.md: ok')
+            }
+          }
+        }
         return allOk ? 0 : 1
       }
 
       for (const file of plan.files) {
         io.writeFile(file.path, file.body)
         out(`kb guards: wrote ${file.path}`)
+      }
+      const existingAgents = io.readFile('AGENTS.md')
+      if (existingAgents !== undefined) {
+        const agentsRes = updateAgentsMd(existingAgents, config.architecture)
+        if (agentsRes.updated) {
+          if (agentsRes.content !== existingAgents) {
+            io.writeFile('AGENTS.md', agentsRes.content)
+            out('kb guards: updated AGENTS.md')
+          }
+        } else if (agentsRes.note) {
+          out(agentsRes.note)
+        }
       }
       for (const note of plan.notes) {
         out(`\n${note}`)

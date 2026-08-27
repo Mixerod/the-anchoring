@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseConfig, type Layer } from './config.js'
 import { planGuards } from './guards.js'
+import { renderAgentsMd } from './agents.js'
 
 export interface InitOptions {
   readonly kbRoot?: string | undefined
@@ -240,6 +241,15 @@ export function planInit(root: string, options: InitOptions, probe: FsProbe): In
     { path: `${kbRoot}/hazard/.gitkeep`, body: '' },
     { path: `${kbRoot}/session/.gitkeep`, body: '' },
   )
+
+  if (!probe('AGENTS.md')) {
+    const rawAgentsTemplate = loadTemplate('AGENTS.md')
+    const arch = configObj['architecture'] as import('./config.js').Architecture | undefined
+    const renderedAgents = renderAgentsMd(rawAgentsTemplate, arch)
+    files.push({ path: 'AGENTS.md', body: renderedAgents })
+  } else {
+    notes.push('AGENTS.md already exists; skipping generation to preserve existing instructions.')
+  }
 
   // Add the three gates to notes
   notes.push(
