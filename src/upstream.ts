@@ -22,6 +22,7 @@
 import type { AnchoringConfig } from './config.js'
 import type { Entity, Store } from './store.js'
 import { EVIDENCE_CLASSES } from './model.js'
+import { fnv1a } from './fnv.js'
 
 export interface PackageFacts {
   readonly name: string
@@ -80,14 +81,7 @@ function touchedPaths(entity: Entity): readonly string[] {
  * FNV-1a over the canonical body — see `hashableBody` for what "canonical" means here.
  */
 export function upstreamHash(body: string): string {
-  const str = hashableBody(body)
-  let hash = 0xcbf29ce484222325n
-  const prime = 0x100000001b3n
-  for (let i = 0; i < str.length; i++) {
-    hash ^= BigInt(str.charCodeAt(i))
-    hash = (hash * prime) & 0xffffffffffffffffn
-  }
-  return hash.toString(16).padStart(16, '0')
+  return fnv1a(hashableBody(body))
 }
 
 /**

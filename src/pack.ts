@@ -6,6 +6,7 @@
 
 import type { AnchoringConfig } from './config.js'
 import type { GeneratedFile } from './guards.js'
+import { fnv1a } from './fnv.js'
 
 export interface PackManifest {
   readonly name: string
@@ -110,14 +111,7 @@ function hashableBody(body: string): string {
 }
 
 export function packHash(body: string): string {
-  const str = hashableBody(body)
-  let hash = 0xcbf29ce484222325n
-  const prime = 0x100000001b3n
-  for (let i = 0; i < str.length; i++) {
-    hash ^= BigInt(str.charCodeAt(i))
-    hash = (hash * prime) & 0xffffffffffffffffn
-  }
-  return hash.toString(16).padStart(16, '0')
+  return fnv1a(hashableBody(body))
 }
 
 /** A `.mjs` file cannot carry an HTML comment, so the header's syntax follows the file. */

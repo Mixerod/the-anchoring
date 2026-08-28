@@ -9,6 +9,7 @@
  */
 
 import type { AnchoringConfig, Architecture } from './config.js'
+import { fnv1a } from './fnv.js'
 
 export interface GeneratedFile {
   readonly path: string        // repo-relative
@@ -43,14 +44,7 @@ function canonicalJson(val: unknown): string {
 }
 
 export function guardsHash(architecture: Architecture): string {
-  const str = canonicalJson(architecture)
-  let hash = 0xcbf29ce484222325n
-  const prime = 0x100000001b3n
-  for (let i = 0; i < str.length; i++) {
-    hash ^= BigInt(str.charCodeAt(i))
-    hash = (hash * prime) & 0xffffffffffffffffn
-  }
-  return hash.toString(16).padStart(16, '0')
+  return fnv1a(canonicalJson(architecture))
 }
 
 function escapeRegex(str: string): string {
