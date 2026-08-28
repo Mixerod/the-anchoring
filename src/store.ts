@@ -27,7 +27,11 @@ export interface Entity {
  * day the author actually wrote.
  */
 function scalar(value: unknown): string {
-  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value)
+  if (value instanceof Date) return value.toISOString().slice(0, 10)
+  if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+    return JSON.stringify(value)
+  }
+  return String(value)
 }
 
 export interface LoadProblem {

@@ -10,6 +10,7 @@ governs:
   - file:src/resolver.ts
   - file:src/config.ts
   - file:src/root.ts
+  - file:src/ask.ts
 constrains:
   - INV-PURE-CORE
   - INV-DEP-DIRECTION

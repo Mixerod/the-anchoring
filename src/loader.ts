@@ -60,3 +60,57 @@ export function loadStore(config: AnchoringConfig): Store {
 
   return buildStore(results)
 }
+
+export interface DoctrineSummary {
+  readonly path: string
+  readonly name: string
+  readonly title?: string
+}
+
+function listMarkdownRecursive(dir: string): readonly string[] {
+  let entries: readonly string[]
+  try {
+    entries = readdirSync(dir, { recursive: true }) as string[]
+  } catch {
+    return []
+  }
+  const result: string[] = []
+  for (const entry of entries) {
+    if (!entry.endsWith('.md') || entry.startsWith('0000-template')) continue
+    const full = join(dir, entry)
+    try {
+      if (statSync(full).isFile()) {
+        result.push(full)
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return result
+}
+
+export function loadDoctrine(config: AnchoringConfig): readonly DoctrineSummary[] {
+  const doctrineDir = join(config.root, config.kbRoot, 'doctrine')
+  const paths = listMarkdownRecursive(doctrineDir)
+  const summaries: DoctrineSummary[] = []
+  for (const p of paths) {
+    const rel = relative(config.root, p).split(sep).join('/')
+    const relToDoctrine = relative(doctrineDir, p).split(sep).join('/')
+    let title: string | undefined
+    try {
+      const text = readFileSync(p, 'utf8')
+      const firstHeading = text.split(/\r?\n/).find((line) => line.startsWith('# '))
+      if (firstHeading) {
+        title = firstHeading.slice(2).trim()
+      }
+    } catch {
+      // ignore
+    }
+    summaries.push({
+      path: rel,
+      name: relToDoctrine,
+      ...(title ? { title } : {}),
+    })
+  }
+  return summaries.sort((a, b) => a.name.localeCompare(b.name))
+}

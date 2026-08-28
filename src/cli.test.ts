@@ -224,3 +224,45 @@ describe('isDirectlyInvoked (INC-0002: the CLI that exited 0 having done nothing
     expect(realPath(missing)).toBe(missing)
   })
 })
+
+describe('kb ask', () => {
+  const ASK_CORPUS = fixture({
+    '.anchor/invariant/INV-DEP-DIRECTION.md':
+      '---\nid: INV-DEP-DIRECTION\ntitle: Dependencies point one way, down the layer order\nstatus: active\n---\n',
+    'docs/adr/0001-payment.md':
+      '---\nid: ADR-0001\ntitle: Payment Webhook Architecture\nstatus: accepted\ntags:\n  - payment\n  - stripe\n---\n',
+    '.anchor/incident/INC-0001.md':
+      '---\nid: INC-0001\ntitle: The CLI checked nothing and exited 0 when installed as a package\nstatus: fixed\n---\n',
+  })
+
+  test('errors with usage when query is missing', () => {
+    const result = invoke(['ask'], ASK_CORPUS)
+    expect(result.code).toBe(2)
+    expect(result.err).toContain('usage: kb ask "<query>"')
+  })
+
+  test('returns 0 and prints formatted report for a query', () => {
+    const result = invoke(['ask', 'payment'], ASK_CORPUS)
+    expect(result.code).toBe(0)
+    expect(result.out).toContain('Invariants (must always hold)')
+    expect(result.out).toContain('INV-DEP-DIRECTION')
+    expect(result.out).toContain('Decisions')
+    expect(result.out).toContain('ADR-0001')
+  })
+
+  test('supports --json output', () => {
+    const result = invoke(['ask', 'payment', '--json'], ASK_CORPUS)
+    expect(result.code).toBe(0)
+    const parsed = JSON.parse(result.out)
+    expect(parsed.query).toBe('payment')
+    expect(parsed.ranked.ADR[0].entity.id).toBe('ADR-0001')
+  })
+
+  test('supports --limit flag', () => {
+    const result = invoke(['ask', '--limit', '1', 'payment', '--json'], ASK_CORPUS)
+    expect(result.code).toBe(0)
+    const parsed = JSON.parse(result.out)
+    expect(parsed.ranked.ADR.length).toBe(1)
+  })
+})
+

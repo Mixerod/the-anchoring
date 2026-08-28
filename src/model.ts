@@ -62,9 +62,9 @@ export const LINK_FIELDS: Readonly<Record<EntityKind, Readonly<Record<string, Li
  * change, and `store.ts` never learns what a hazard is.
  */
 export const SCALAR_FIELDS: Readonly<Record<EntityKind, readonly string[]>> = {
-  ADR: ['governs_nothing', 'owner'],
-  INV: ['owner'],
-  FLOW: [],
+  ADR: ['governs_nothing', 'owner', 'tags'],
+  INV: ['owner', 'tags'],
+  FLOW: ['tags'],
   /**
    * `executed_by` is a free string with no shape constraint, on purpose.
    *
@@ -79,7 +79,7 @@ export const SCALAR_FIELDS: Readonly<Record<EntityKind, readonly string[]>> = {
    * identifies nobody. `executed_by` names a tool, and constraining it to a handle shape
    * would repeat the same mistake in the other direction.
    */
-  WORK: ['owner', 'executed_by'],
+  WORK: ['owner', 'executed_by', 'tags'],
   INC: [
     'upstream',
     'upstream_verdict',
@@ -88,8 +88,9 @@ export const SCALAR_FIELDS: Readonly<Record<EntityKind, readonly string[]>> = {
     'upstream_rejected',
     'upstream_recorded',
     'upstream_work',
+    'tags',
   ],
-  HAZ: ['source', 'observed', 'recorded', 'resolution', 'reason'],
+  HAZ: ['source', 'observed', 'recorded', 'resolution', 'reason', 'tags'],
 }
 
 /**

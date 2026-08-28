@@ -157,6 +157,45 @@ function checkOwner(entity: Entity): readonly Finding[] {
   return []
 }
 
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+export function checkTags(entity: Entity): readonly Finding[] {
+  const raw = entity.fields['tags']
+  if (raw === undefined) return []
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    parsed = undefined
+  }
+
+  if (!Array.isArray(parsed)) {
+    return [
+      {
+        severity: 'error',
+        where: `${entity.id} · tags`,
+        message: `\`${raw}\` must be a list of lowercase slugs`,
+        hint: 'tags must be formatted as a YAML list of lowercase slugs, e.g. [foo, bar]',
+      },
+    ]
+  }
+
+  const findings: Finding[] = []
+  for (const item of parsed) {
+    const str = typeof item === 'string' ? item : String(item)
+    if (typeof item !== 'string' || !SLUG_PATTERN.test(item)) {
+      findings.push({
+        severity: 'error',
+        where: `${entity.id} · tags`,
+        message: `\`${str}\` is not a lowercase slug`,
+        hint: 'a tag must contain only lowercase letters, numbers, and hyphens',
+      })
+    }
+  }
+  return findings
+}
+
 export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyReport {
   const store = loadStore(config)
   const resolver = createResolver(config)
@@ -174,6 +213,7 @@ export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyR
     findings.push(...checkGovernsSomething(entity))
     findings.push(...checkHazard(entity, now, config.hazard))
     findings.push(...checkOwner(entity))
+    findings.push(...checkTags(entity))
     findings.push(...checkUpstream(entity, config, now))
     const anchors = checkAnchors(entity, resolver)
     findings.push(...anchors.findings)

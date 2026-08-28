@@ -6,7 +6,7 @@ Instructions for autonomous AI agents working in this repository.
 Before answering, planning, or editing: run `kb ctx W-<n>` for the work item. If you were not given one, ask for it or open one. There is no small-change exemption.
 
 ## 2. Retrieval
-Before reading files by hand, run `kb why <file|symbol>`. Read what it names and stop there.
+When no work item exists yet, run `kb ask "<question>"` to find relevant decisions, invariants, and prior incidents. Before reading files by hand, run `kb why <file|symbol>`. Read what it names and stop there.
 
 ## 3. While working
 Keep `touches:` current in the work item as you learn what the change reaches. Never write a derived field into a document.

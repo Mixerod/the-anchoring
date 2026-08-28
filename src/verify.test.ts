@@ -192,3 +192,45 @@ describe('executed_by is a free string (T19)', () => {
     expect(findings[0]?.where).toBe('W-1 · owner')
   })
 })
+
+describe('tags field validation on all six kinds (Layer 4 Part B)', () => {
+  test('tags: accepted on all six kinds when formatted as a list of lowercase slugs', () => {
+    const root = fixture(
+      { path: 'src/app.ts', body: 'export const x = 1\n' },
+      adr('0001-a.md', '---\nid: ADR-0001\ntitle: A\nstatus: accepted\ngoverns:\n  - file:src/app.ts\ntags:\n  - arch\n  - module-boundaries\n---\n'),
+      inv('INV-A.md', '---\nid: INV-A\ntitle: Inv\nstatus: active\ntags:\n  - pure-core\n  - layering\n---\n'),
+      { path: '.anchor/flow/FLOW-0001.md', body: '---\nid: FLOW-0001\ntitle: Flow\nstatus: live\ntags:\n  - auth\n---\n' },
+      { path: '.anchor/work/W-1.md', body: '---\nid: W-1\ntitle: Work\nstatus: done\ntags:\n  - refactor\n---\n' },
+      { path: '.anchor/incident/INC-0001.md', body: '---\nid: INC-0001\ntitle: Inc\nstatus: fixed\ntags:\n  - cli\n  - bugfix\n---\n' },
+      {
+        path: '.anchor/hazard/HAZ-0001.md',
+        body: '---\nid: HAZ-0001\ntitle: Haz\nstatus: active\nsource: https://example.com/h\nobserved: 2026-01-01\nrecorded: 2026-01-02\nresolution: accepted\nreason: tested\nholds_for:\n  - file:src/app.ts\ntags:\n  - security\n---\n',
+      },
+    )
+
+    const report = verify(conf(root))
+    expect(report.findings).toEqual([])
+    expect(report.entityCount).toBe(6)
+  })
+
+  test('fails when tags is not a list (e.g. a bare string or number)', () => {
+    const root = fixture(
+      adr('0001-a.md', '---\nid: ADR-0001\ntitle: A\nstatus: accepted\ngoverns_nothing: reason\ntags: not-a-list\n---\n'),
+    )
+    const [finding] = errors(root)
+    expect(finding?.where).toBe('ADR-0001 · tags')
+    expect(finding?.message).toContain('must be a list of lowercase slugs')
+    expect(finding?.message).toContain('not-a-list')
+  })
+
+  test('fails when a tag in the list is not a lowercase slug, naming the offending value', () => {
+    const root = fixture(
+      adr('0001-a.md', '---\nid: ADR-0001\ntitle: A\nstatus: accepted\ngoverns_nothing: reason\ntags:\n  - valid-slug\n  - Invalid_Slug!\n---\n'),
+    )
+    const [finding] = errors(root)
+    expect(finding?.where).toBe('ADR-0001 · tags')
+    expect(finding?.message).toContain('is not a lowercase slug')
+    expect(finding?.message).toContain('Invalid_Slug!')
+  })
+})
+
