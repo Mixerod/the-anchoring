@@ -10,7 +10,7 @@
 
 import { load } from 'js-yaml'
 
-const FENCE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
+const FENCE = /^(?:<!--[\s\S]*?-->\r?\n\s*)*---\r?\n([\s\S]*?)\r?\n---\r?\n?/
 
 export type Frontmatter = Readonly<Record<string, unknown>>
 

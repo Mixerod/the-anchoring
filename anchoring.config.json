@@ -34,7 +34,8 @@
         "name": "cli",
         "paths": [
           "src/cli.ts",
-          "src/cli-upstream.ts"
+          "src/cli-upstream.ts",
+          "src/cli-pack.ts"
         ]
       },
       {
@@ -63,7 +64,9 @@
           "src/model.ts",
           "src/frontmatter.ts",
           "src/anchors.ts",
-          "src/upstream.ts"
+          "src/upstream.ts",
+          "src/ask.ts",
+          "src/pack.ts"
         ],
         "pure": true
       },
@@ -74,7 +77,8 @@
           "src/git.ts",
           "src/loader.ts",
           "src/resolver.ts",
-          "src/session.ts"
+          "src/session.ts",
+          "src/pack-source.ts"
         ]
       }
     ],

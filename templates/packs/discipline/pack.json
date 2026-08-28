@@ -1,0 +1,5 @@
+{
+  "name": "discipline",
+  "version": "1.0.0",
+  "description": "Module boundaries, secret handling, and agent verification discipline."
+}

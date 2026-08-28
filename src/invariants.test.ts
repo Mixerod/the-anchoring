@@ -93,7 +93,7 @@ describe('invariants enforcement (eslint)', { timeout: 20_000 }, () => {
         })
         .join('\n')
 
-    for (const file of ['src/upstream.ts', 'src/guards.ts']) {
+    for (const file of ['src/upstream.ts', 'src/guards.ts', 'src/pack.ts', 'src/ask.ts']) {
       it(`${file} performs no I/O and reads no clock`, async () => {
         const { readFileSync } = await import('node:fs')
         const source = readFileSync(file, 'utf8')
@@ -109,6 +109,8 @@ describe('invariants enforcement (eslint)', { timeout: 20_000 }, () => {
   describe('public index exports', () => {
     it('exports all expected public APIs', async () => {
       const index = await import('./index.js')
+      expect(index.ask).toBeTypeOf('function')
+      expect(index.renderAsk).toBeTypeOf('function')
       expect(index.verify).toBeTypeOf('function')
       expect(index.why).toBeTypeOf('function')
       expect(index.ctx).toBeTypeOf('function')

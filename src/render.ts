@@ -10,6 +10,7 @@ import type { Finding, VerifyReport } from './verify.js'
 import type { WhyReport } from './why.js'
 import type { CtxReport } from './ctx.js'
 import type { DoneReport } from './done.js'
+import type { AskReport } from './ask.js'
 
 const ESC = String.fromCharCode(27)
 
@@ -107,12 +108,14 @@ export function renderWhy(report: WhyReport, c: Palette = COLOUR): string {
 
 export const USAGE =
   'kb - the intent graph over this repository\n\n' +
+  '  kb ask "<query>"       what bears on a task before a work item exists\n' +
   '  kb ctx <W-id>          everything that bears on a piece of work, before you start\n' +
   '  kb why <target>        what a file, symbol, or entity is for\n' +
   '  kb done <W-id>         what still needs recording, before you finish\n' +
   '  kb verify [--strict]   check every claim the docs make about the code\n' +
   '  kb guards [--check]    generate checkers from the architecture matrix\n' +
   '  kb owners [--check]    project ownership into CODEOWNERS\n' +
+  '  kb pack <subcommand>   portable engineering knowledge packs (list, add, check)\n' +
   '  kb upstream [--check]  project attributable incidents into reviewable reports\n' +
   '                         --list, --dry-run, --open-work <path-to-upstream-repo>\n'
 
@@ -197,3 +200,62 @@ export function renderDone(report: DoneReport, c: Palette = COLOUR): string {
   }
   return [...lines, ...notices].join('\n')
 }
+
+export function renderAsk(report: AskReport, c: Palette = COLOUR): string {
+  const lines: string[] = []
+
+  lines.push(`${c.bold}Invariants (must always hold)${c.off}`)
+  if (report.invariants.length === 0) {
+    lines.push(`  ${c.dim}no active invariants${c.off}`)
+  } else {
+    for (const inv of report.invariants) {
+      lines.push(`  ${inv.id.padEnd(20)} ${inv.title}`)
+      lines.push(`  ${' '.repeat(20)} ${c.dim}${inv.path}${c.off}`)
+    }
+  }
+
+  if (report.openHazards.length > 0) {
+    lines.push('', `${c.bold}Open hazards (unresolved failure modes)${c.off}`)
+    for (const haz of report.openHazards) {
+      lines.push(`  ${haz.id.padEnd(20)} ${haz.title}`)
+      lines.push(`  ${' '.repeat(20)} ${c.dim}${haz.path}${c.off}`)
+    }
+  }
+
+  const kindHeadings: Record<'ADR' | 'FLOW' | 'WORK' | 'INC', string> = {
+    ADR: 'Decisions',
+    FLOW: 'User flows',
+    WORK: 'Work items',
+    INC: 'Incidents',
+  }
+
+  if (report.totalMatches === 0) {
+    lines.push(
+      '',
+      `${c.yellow}No ranked matches for "${report.query}" (searched ${report.corpusSize} entities).${c.off}`,
+      `${c.dim}The invariants above still apply to all work in this repository.${c.off}`,
+    )
+  } else {
+    for (const kind of ['ADR', 'FLOW', 'WORK', 'INC'] as const) {
+      const matches = report.ranked[kind]
+      if (matches.length === 0) continue
+      lines.push('', `${c.bold}${kindHeadings[kind]}${c.off}`)
+      for (const m of matches) {
+        lines.push(`  ${m.entity.id.padEnd(20)} ${m.entity.title} ${c.dim}(${m.entity.status})${c.off}`)
+        lines.push(`  ${' '.repeat(20)} ${c.dim}${m.entity.path}${c.off}`)
+      }
+    }
+  }
+
+  if (report.doctrine.length > 0) {
+    lines.push('', `${c.bold}Doctrine${c.off}`)
+    for (const doc of report.doctrine) {
+      const label = doc.title ? `${doc.name} - ${doc.title}` : doc.name
+      lines.push(`  ${label}`)
+      lines.push(`  ${' '.repeat(2)} ${c.dim}${doc.path}${c.off}`)
+    }
+  }
+
+  return lines.join('\n')
+}
+

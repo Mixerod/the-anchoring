@@ -14,6 +14,23 @@ import {
 
 export const ARCHITECTURE_START_MARKER = '<!-- kb:architecture:start -->'
 export const ARCHITECTURE_END_MARKER = '<!-- kb:architecture:end -->'
+export const DOCTRINE_START_MARKER = '<!-- kb:doctrine:start -->'
+export const DOCTRINE_END_MARKER = '<!-- kb:doctrine:end -->'
+
+export function generateDoctrineSection(doctrineFiles?: readonly string[]): string {
+  if (!doctrineFiles || doctrineFiles.length === 0) {
+    return ''
+  }
+  const lines = [
+    '## Engineering doctrine',
+    '',
+    'Non-machine-checked engineering rules live in `.anchor/doctrine/`:',
+    ...doctrineFiles.map((f) => `- \`${f}\``),
+    '',
+    'Read them when making architectural decisions or reviewing work.',
+  ]
+  return lines.join('\n')
+}
 
 export function generateArchitectureSection(
   arch?: Partial<Architecture> | Architecture,
@@ -73,20 +90,36 @@ ${diagramLines}
   return sections.join('\n\n')
 }
 
+function replaceBetweenMarkers(
+  content: string,
+  startMarker: string,
+  endMarker: string,
+  sectionContent: string,
+): string {
+  if (!content.includes(startMarker) || !content.includes(endMarker)) {
+    return content
+  }
+  const startIdx = content.indexOf(startMarker)
+  const endIdx = content.indexOf(endMarker) + endMarker.length
+  const replacement = sectionContent
+    ? `${startMarker}\n${sectionContent}\n${endMarker}`
+    : `${startMarker}\n${endMarker}`
+  return content.slice(0, startIdx) + replacement + content.slice(endIdx)
+}
+
 export function renderAgentsMd(
   template: string,
   arch?: Partial<Architecture> | Architecture,
+  doctrineFiles?: readonly string[],
 ): string {
+  let result = template
   const archSection = generateArchitectureSection(arch)
-  const replacement = `${ARCHITECTURE_START_MARKER}\n${archSection}\n${ARCHITECTURE_END_MARKER}`
+  result = replaceBetweenMarkers(result, ARCHITECTURE_START_MARKER, ARCHITECTURE_END_MARKER, archSection)
 
-  if (template.includes(ARCHITECTURE_START_MARKER) && template.includes(ARCHITECTURE_END_MARKER)) {
-    const startIdx = template.indexOf(ARCHITECTURE_START_MARKER)
-    const endIdx = template.indexOf(ARCHITECTURE_END_MARKER) + ARCHITECTURE_END_MARKER.length
-    return template.slice(0, startIdx) + replacement + template.slice(endIdx)
-  }
+  const doctrineSection = generateDoctrineSection(doctrineFiles)
+  result = replaceBetweenMarkers(result, DOCTRINE_START_MARKER, DOCTRINE_END_MARKER, doctrineSection)
 
-  return template
+  return result
 }
 
 export interface UpdateAgentsResult {
@@ -98,6 +131,7 @@ export interface UpdateAgentsResult {
 export function updateAgentsMd(
   existingContent: string,
   arch?: Partial<Architecture> | Architecture,
+  doctrineFiles?: readonly string[],
 ): UpdateAgentsResult {
   if (
     !existingContent.includes(ARCHITECTURE_START_MARKER) ||
@@ -110,14 +144,17 @@ export function updateAgentsMd(
     }
   }
 
-  const startIdx = existingContent.indexOf(ARCHITECTURE_START_MARKER)
-  const endIdx = existingContent.indexOf(ARCHITECTURE_END_MARKER) + ARCHITECTURE_END_MARKER.length
-
+  let newContent = existingContent
   const archSection = generateArchitectureSection(arch)
-  const replacement = `${ARCHITECTURE_START_MARKER}\n${archSection}\n${ARCHITECTURE_END_MARKER}`
+  newContent = replaceBetweenMarkers(newContent, ARCHITECTURE_START_MARKER, ARCHITECTURE_END_MARKER, archSection)
 
-  const newContent =
-    existingContent.slice(0, startIdx) + replacement + existingContent.slice(endIdx)
+  if (
+    newContent.includes(DOCTRINE_START_MARKER) &&
+    newContent.includes(DOCTRINE_END_MARKER)
+  ) {
+    const doctrineSection = generateDoctrineSection(doctrineFiles)
+    newContent = replaceBetweenMarkers(newContent, DOCTRINE_START_MARKER, DOCTRINE_END_MARKER, doctrineSection)
+  }
 
   return {
     content: newContent,

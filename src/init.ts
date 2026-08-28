@@ -18,12 +18,15 @@ import {
 } from './config.js'
 import { planGuards } from './guards.js'
 import { renderAgentsMd } from './agents.js'
+import { planPack } from './pack.js'
+import { findPack } from './pack-source.js'
 
 export interface InitOptions {
   readonly kbRoot?: string | undefined
   readonly dryRun?: boolean | undefined
   readonly force?: boolean | undefined
   readonly guards?: boolean | undefined
+  readonly pack?: string | undefined
 }
 
 export type FsProbe = (relPath: string) => boolean
@@ -261,10 +264,32 @@ export function planInit(root: string, options: InitOptions, probe: FsProbe): In
     { path: `${kbRoot}/session/.gitkeep`, body: '' },
   )
 
+  let packDoctrineFiles: string[] | undefined
+  if (options.pack) {
+    const foundPack = findPack(options.pack)
+    if (!foundPack.ok) {
+      throw new Error(`cannot seed pack '${options.pack}': ${foundPack.error}`)
+    }
+    const parsedRes = parseConfig(root, configObj)
+    if (parsedRes.ok) {
+      const packPlan = planPack(
+        foundPack.pack,
+        parsedRes.config,
+        () => undefined,
+        options.force !== undefined ? { force: options.force } : undefined,
+      )
+      for (const d of packPlan.dirs) if (!dirs.includes(d)) dirs.push(d)
+      for (const f of packPlan.files) files.push(f)
+      for (const n of packPlan.notes) notes.push(n)
+      const doctrines = foundPack.pack.files.filter((f) => f.kind === 'doctrine').map((f) => f.basename)
+      if (doctrines.length > 0) packDoctrineFiles = doctrines
+    }
+  }
+
   if (!probe('AGENTS.md')) {
     const rawAgentsTemplate = loadTemplate('AGENTS.md')
     const arch = configObj['architecture'] as import('./config.js').Architecture | undefined
-    const renderedAgents = renderAgentsMd(rawAgentsTemplate, arch)
+    const renderedAgents = renderAgentsMd(rawAgentsTemplate, arch, packDoctrineFiles)
     files.push({ path: 'AGENTS.md', body: renderedAgents })
   } else {
     notes.push('AGENTS.md already exists; skipping generation to preserve existing instructions.')

@@ -1,0 +1,11 @@
+# Gates and Automation
+
+Balancing mechanical gates with agent developer workflow.
+
+## Principles
+
+1. **An advisory gate reports; it never fails the turn.** A gate that blocks on bookkeeping is switched off within a week, and then nothing is enforced at all. Reserve hard failure for the one gate that cannot be bypassed — usually CI.
+
+2. **Silence must be earned.** A gate that stays quiet on the exact case it was built for is worse than no gate, because it also removes the suspicion that would have caught the problem. When adding a check, write the test where it must *speak*, not only the one where it must pass.
+
+3. **Anything that runs on every turn must be milliseconds and must never call a model.** It is paid hundreds of times a day.

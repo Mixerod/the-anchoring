@@ -18,14 +18,16 @@ import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type I
 import { planGuards, checkGuards } from './guards.js'
 import { updateAgentsMd } from './agents.js'
 import { planOwners } from './owners.js'
+import { ask } from './ask.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
 import { done, unclaimedWork } from './done.js'
-import { COLOUR, PLAIN, USAGE, renderCtx, renderDone, renderUnclaimed, renderVerify, renderWhy } from './render.js'
+import { COLOUR, PLAIN, USAGE, renderAsk, renderCtx, renderDone, renderUnclaimed, renderVerify, renderWhy } from './render.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
 import { runUpstream } from './cli-upstream.js'
+import { packCommand } from './cli-pack.js'
 
 /**
  * Whether this module is the program being run, rather than a module being imported.
@@ -66,6 +68,11 @@ export function run(
   const palette = rest.includes('--no-colour') ? PLAIN : COLOUR
   const positional = rest.find((a) => !a.startsWith('-'))
 
+  if (command === 'pack') {
+    const packRoot = root ?? findRepoRoot(process.cwd()) ?? process.cwd()
+    return packCommand(rest, packRoot, out, err)
+  }
+
   if (command === 'init') {
     let kbRootArg: string | undefined
     const kbRootIndex = rest.indexOf('--kb-root')
@@ -77,6 +84,18 @@ export function run(
         kbRootArg = kbRootFlag.slice('--kb-root='.length)
       }
     }
+
+    let packArg: string | undefined
+    const packIndex = rest.indexOf('--pack')
+    if (packIndex !== -1 && rest[packIndex + 1]) {
+      packArg = rest[packIndex + 1]
+    } else {
+      const packFlag = rest.find((a) => a.startsWith('--pack='))
+      if (packFlag) {
+        packArg = packFlag.slice('--pack='.length)
+      }
+    }
+
     const dryRun = rest.includes('--dry-run')
     const force = rest.includes('--force')
     const guards = rest.includes('--guards')
@@ -87,7 +106,7 @@ export function run(
 
     let plan: InitPlan
     try {
-      plan = planInit(initRoot, { kbRoot: kbRootArg, dryRun, force, guards }, probe)
+      plan = planInit(initRoot, { kbRoot: kbRootArg, dryRun, force, guards, pack: packArg }, probe)
     } catch (e) {
       err(`kb init: ${(e as Error).message}`)
       return 1
@@ -137,6 +156,33 @@ export function run(
   const config = configResult.config
 
   switch (command) {
+    case 'ask': {
+      let limit: number | undefined
+      const limitIndex = rest.indexOf('--limit')
+      let query = positional
+      if (limitIndex !== -1) {
+        const nextArg = rest[limitIndex + 1]
+        if (nextArg !== undefined) {
+          const parsed = parseInt(nextArg, 10)
+          if (!isNaN(parsed) && parsed > 0) limit = parsed
+          if (positional === nextArg) {
+            query = rest.find((a, i) => !a.startsWith('-') && i !== limitIndex + 1)
+          }
+        }
+      }
+      if (!query) {
+        err('usage: kb ask "<query>" [--json] [--limit <n>]')
+        return 2
+      }
+      const report = ask(config, query, limit !== undefined ? { limit } : undefined)
+      if (rest.includes('--json')) {
+        out(JSON.stringify(report, null, 2))
+        return 0
+      }
+      out(renderAsk(report, palette))
+      return 0
+    }
+
     case 'ctx': {
       if (!positional) {
         err('usage: kb ctx <W-id>')

@@ -96,13 +96,14 @@ npx kb verify [--strict]       # machine check every claim across the repository
 
 ---
 
-## Downstream copy outside this repository
+## Engineering Knowledge Packs
 
-Section 4 of `~/.claude/rules/personal/30-agent-discipline.md` on this machine ("Tools that
-other repositories install") was derived from this project's design: generate configuration
-rather than run a toolchain, never edit a file the host owns, split plan from apply, purity
-as the redaction mechanism, generated files carry a header and a hash.
+Cross-repository invariants, hazards, and doctrine are distributed as **packs**:
 
-No anchor can reach across that boundary, so nothing checks the two against each other.
-**When the guards or upstream-loop design changes on a point of principle, review that file
-in the same sitting.** A matching note lives at the top of it.
+```bash
+npx kb pack list                     # view available packs
+npx kb pack add discipline           # seed the discipline pack into .anchor/
+npx kb pack check                    # verify that seeded knowledge has not drifted
+```
+
+The built-in `discipline` pack (`templates/packs/discipline/`) packages module boundaries, credential safety, and agent verification discipline so any repository can adopt them.

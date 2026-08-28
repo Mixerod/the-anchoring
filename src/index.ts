@@ -103,6 +103,22 @@ export { rememberWork, recallWork } from './session.js'
 export { verify, type VerifyReport, type Finding, type Severity } from './verify.js'
 export { checkHazard, checkHazardCeiling } from './verify-hazard.js'
 export { checkUpstream, checkUpstreamCeiling, isEscalated } from './verify-upstream.js'
+export { checkTags } from './verify.js'
+
+// Ask (Free text front door - Layer 4 Part B)
+export {
+  ask,
+  askStore,
+  scoreEntity,
+  tokenise,
+  extractQueryTokens,
+  DEFAULT_ASK_LIMIT,
+  type AskReport,
+  type AskOptions,
+  type RankedMatch,
+  type RankedKind,
+  type DoctrineSummary,
+} from './ask.js'
 
 // Why (Reverse walk)
 export { why, type WhyReport, type CodeMention, type EntityEdge } from './why.js'
@@ -146,6 +162,7 @@ export {
 
 // Render
 export {
+  renderAsk,
   renderVerify,
   renderWhy,
   renderCtx,
@@ -156,6 +173,41 @@ export {
   USAGE,
   type Palette,
 } from './render.js'
+
+// Pack (Layer 4 Part A)
+export {
+  parsePackManifest,
+  packHash,
+  packHeader,
+  stripPackHeader,
+  targetPathForFile,
+  planPack,
+  checkPack,
+  type PackManifest,
+  type PackFile,
+  type Pack,
+  type PackPlan,
+  type PackFileState,
+  type PackFileCheckResult,
+  type PackCheckResult,
+} from './pack.js'
+export {
+  userPackDirs,
+  loadPack,
+  resolvePacks,
+  findPack,
+  applyPack,
+  defaultPackIo,
+  type PackIo,
+  type PackApplyResult,
+  type ResolveOptions,
+} from './pack-source.js'
+export { packCommand } from './cli-pack.js'
+export {
+  generateDoctrineSection,
+  DOCTRINE_START_MARKER,
+  DOCTRINE_END_MARKER,
+} from './agents.js'
 
 // Upstream loop (Layer 3.1)
 export {

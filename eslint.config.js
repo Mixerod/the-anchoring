@@ -4,7 +4,7 @@ import tseslint from 'typescript-eslint'
 import anchoringGuards from './anchoring.guards.mjs'
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/*.cjs'] },
+  { ignores: ['**/dist/**', '**/coverage/**', '**/node_modules/**', '**/*.cjs', 'scripts/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...anchoringGuards,
@@ -37,6 +37,8 @@ export default tseslint.config(
       // are: it exists so `src/upstream.ts` can stay pure, and purity there is the
       // redaction guarantee. See the module doc comment.
       'src/cli-upstream.ts',
+      'src/pack-source.ts',
+      'src/cli-pack.ts',
     ],
     rules: {
       'no-restricted-imports': [

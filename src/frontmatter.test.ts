@@ -14,6 +14,13 @@ describe('parseFrontmatter', () => {
     expect(result.ok && result.data['id']).toBe('ADR-0001')
   })
 
+  test('reads a block with leading HTML comments (e.g. pack header)', () => {
+    const text = '<!-- header line 1 -->\n<!-- header line 2 -->\n\n---\nid: INV-0001\nstatus: active\n---\nbody\n'
+    const result = parseFrontmatter(text)
+
+    expect(result).toEqual({ ok: true, data: { id: 'INV-0001', status: 'active' } })
+  })
+
   test('rejects a document with no frontmatter block', () => {
     const result = parseFrontmatter('# Just a heading\n')
 
