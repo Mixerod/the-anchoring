@@ -50,6 +50,28 @@ export const gitChangedFiles: ChangedFiles = (root) => {
 /* c8 ignore stop */
 
 /**
+ * Files changed since a git ref, or `undefined` when git could not tell.
+ *
+ * The distinction is the whole point. A ref that does not exist and a ref with no changes
+ * since it are different facts, and collapsing them would make `kb verify --since typo`
+ * print "no entities changed" and exit 0 — a gate reporting success having checked nothing.
+ * That is INC-0001's shape, and this repository has already paid for it once.
+ */
+export type ChangedSince = (root: string, ref: string) => readonly string[] | undefined
+
+/* c8 ignore start -- spawn-and-delegate; the merge rule it delegates to is parseChangedFiles */
+export const gitChangedSince: ChangedSince = (root, ref) => {
+  const result = spawnSync('git', ['diff', '--name-only', ref], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 20_000,
+  })
+  if (result.error || result.status !== 0) return undefined
+  return parseChangedFiles(result.stdout, '')
+}
+/* c8 ignore stop */
+
+/**
  * The pure half of `gitIsDirty`: whether `git status --porcelain` reported anything.
  *
  * A non-zero exit is reported as *not* dirty by the caller, deliberately: "git failed" and

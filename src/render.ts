@@ -11,6 +11,7 @@ import type { WhyReport } from './why.js'
 import type { CtxReport } from './ctx.js'
 import type { DoneReport } from './done.js'
 import type { AskReport } from './ask.js'
+import type { SinceReport } from './since.js'
 
 const ESC = String.fromCharCode(27)
 
@@ -63,6 +64,38 @@ export function renderVerify(report: VerifyReport, c: Palette = COLOUR): string 
   return lines.join('\n')
 }
 
+/**
+ * `kb verify --since <ref>`.
+ *
+ * The empty case is the reason this is a separate renderer rather than a filtered call into
+ * `renderVerify`. A command that checked nothing and printed nothing is indistinguishable
+ * from a broken one — that is INC-0001, and this repository has already paid for it once. So
+ * "no entities changed" is said in words, every time, and the ref is named.
+ */
+export function renderSince(report: SinceReport, c: Palette = COLOUR): string {
+  if (report.changed.length === 0) {
+    return `${c.dim}kb verify: no files changed since \`${report.ref}\`${c.off}`
+  }
+
+  if (report.affected.length === 0) {
+    return (
+      `${c.dim}kb verify: no entities changed since \`${report.ref}\`${c.off}\n` +
+      `${c.dim}(${report.changed.length} file(s) changed, none of them anchored or documented)${c.off}`
+    )
+  }
+
+  const errors = report.findings.filter((f) => f.severity === 'error')
+  const warnings = report.findings.filter((f) => f.severity === 'warn')
+  const scope = `${report.affected.length} entity(ies) affected since ${report.ref}`
+
+  return [
+    ...[...errors, ...warnings].map((f) => renderFinding(f, c)),
+    report.findings.length === 0
+      ? `${c.green}kb verify: clean${c.off} ${c.dim}(${scope})${c.off}`
+      : `\nkb verify: ${errors.length} error(s), ${warnings.length} warning(s) ${c.dim}(${scope})${c.off}`,
+  ].join('\n')
+}
+
 export function renderWhy(report: WhyReport, c: Palette = COLOUR): string {
   const { subject } = report
 
@@ -113,6 +146,9 @@ export const USAGE =
   '  kb why <target>        what a file, symbol, or entity is for\n' +
   '  kb done <W-id>         what still needs recording, before you finish\n' +
   '  kb verify [--strict]   check every claim the docs make about the code\n' +
+  '                         --since <ref> only what changed, --fingerprint the finding set\n' +
+  '  kb brief [--json]      the cacheable cold-start bundle, in four volatility tiers\n' +
+  '                         --check renders twice and compares bytes\n' +
   '  kb guards [--check]    generate checkers from the architecture matrix\n' +
   '  kb owners [--check]    project ownership into CODEOWNERS\n' +
   '  kb pack <subcommand>   portable engineering knowledge packs (list, add, check)\n' +
@@ -172,6 +208,17 @@ export function renderUnclaimed(
 ): string {
   return `${c.yellow}kb done: ${unclaimed.message}${c.off}
     ${c.dim}-> ${unclaimed.fix}${c.off}`
+}
+
+/**
+ * The no-progress line.
+ *
+ * Yellow and one line, exactly like `renderUnclaimed`, and for the same reason: nothing has
+ * failed. The loop is repeating itself, which is worth saying and not worth stopping for.
+ */
+export function renderNoProgress(warning: string, c: Palette = COLOUR): string {
+  return `${c.yellow}kb done: ${warning}${c.off}
+    ${c.dim}-> the last three runs found the same problems; try a different approach${c.off}`
 }
 
 export function renderDone(report: DoneReport, c: Palette = COLOUR): string {

@@ -23,9 +23,11 @@ import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
 import { done, unclaimedWork } from './done.js'
-import { COLOUR, PLAIN, USAGE, renderAsk, renderCtx, renderDone, renderUnclaimed, renderVerify, renderWhy } from './render.js'
+import { COLOUR, PLAIN, USAGE, renderAsk, renderCtx, renderDone, renderNoProgress, renderUnclaimed, renderWhy } from './render.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
+import { briefCommand } from './cli-brief.js'
+import { progressNotice, verifyCommand } from './cli-verify.js'
 import { runUpstream } from './cli-upstream.js'
 import { packCommand } from './cli-pack.js'
 import { promoteCommand } from './cli-promote.js'
@@ -214,6 +216,8 @@ export function run(
         const unclaimed = unclaimedWork(config, changedFiles)
         if (rest.includes('--check')) {
           if (unclaimed) out(renderUnclaimed(unclaimed, palette))
+          const stalled = progressNotice(config, verify(config).findings)
+          if (stalled) out(renderNoProgress(stalled, palette))
           return 0
         }
         err('usage: kb done <W-id> [--check]')
@@ -221,17 +225,21 @@ export function run(
       }
       const report = done(config, workId, changedFiles)
       out(renderDone(report, palette))
+      if (rest.includes('--check')) {
+        // Advisory, and never an exit code: a loop-detector that blocks a commit is one
+        // that gets uninstalled, and then nothing is enforced at all. See fingerprint.ts.
+        const stalled = progressNotice(config, verify(config).findings)
+        if (stalled) out(renderNoProgress(stalled, palette))
+      }
       // --check is the hook mode: report the gaps, never fail the agent's turn over them.
       return report.gaps.length > 0 && !rest.includes('--check') ? 1 : 0
     }
 
-    case 'verify': {
-      const report = verify(config)
-      out(renderVerify(report, palette))
-      const errors = report.findings.filter((f) => f.severity === 'error').length
-      const warnings = report.findings.length - errors
-      return errors > 0 || (rest.includes('--strict') && warnings > 0) ? 1 : 0
-    }
+    case 'verify':
+      return verifyCommand(config, rest, out, err, palette)
+
+    case 'brief':
+      return briefCommand(config, rest, out, err)
 
     case 'why': {
       if (!positional) {

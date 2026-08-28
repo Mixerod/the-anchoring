@@ -36,13 +36,16 @@
           "src/cli.ts",
           "src/cli-upstream.ts",
           "src/cli-pack.ts",
-          "src/cli-promote.ts"
+          "src/cli-promote.ts",
+          "src/cli-brief.ts",
+          "src/cli-verify.ts"
         ]
       },
       {
         "name": "app",
         "paths": [
           "src/render.ts",
+          "src/render-brief.ts",
           "src/init.ts",
           "src/agents.ts"
         ]
@@ -68,7 +71,11 @@
           "src/upstream.ts",
           "src/ask.ts",
           "src/pack.ts",
-          "src/promote.ts"
+          "src/promote.ts",
+          "src/brief.ts",
+          "src/since.ts",
+          "src/fingerprint.ts",
+          "src/fnv.ts"
         ],
         "pure": true
       },
@@ -80,7 +87,8 @@
           "src/loader.ts",
           "src/resolver.ts",
           "src/session.ts",
-          "src/pack-source.ts"
+          "src/pack-source.ts",
+          "src/brief-source.ts"
         ]
       }
     ],
