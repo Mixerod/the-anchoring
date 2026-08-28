@@ -13,8 +13,18 @@ export interface PackManifest {
   readonly description: string
 }
 
+/**
+ * `script` exists because an invariant without a checker is a wish.
+ *
+ * The `discipline` pack shipped `INV-SECRETS-NO-LITERALS` with
+ * `enforced_by: file:scripts/anchoring-scan-secrets.mjs` while the script itself was only
+ * ever hand-written into this repository. Every adopter therefore went from a clean corpus
+ * to a failing `kb verify` the moment they ran `kb pack add` — green here, red everywhere
+ * else, which is `INC-0001`'s shape wearing different clothes. A pack that ships an
+ * invariant must be able to ship the thing that enforces it.
+ */
 export interface PackFile {
-  readonly kind: 'invariant' | 'hazard' | 'doctrine'
+  readonly kind: 'invariant' | 'hazard' | 'doctrine' | 'script'
   readonly basename: string
   readonly body: string
 }
@@ -110,22 +120,58 @@ export function packHash(body: string): string {
   return hash.toString(16).padStart(16, '0')
 }
 
-export function packHeader(name: string, version: string, hash: string): string {
-  return [
-    `<!-- the-anchoring:pack ${name}@${version} hash:${hash} -->`,
-    `<!-- Seeded by \`kb pack add ${name}\`. Edit freely — \`kb pack check\` will report it as`,
-    '     hand-edited rather than overwrite it. -->',
-  ].join('\n')
+/** A `.mjs` file cannot carry an HTML comment, so the header's syntax follows the file. */
+export type HeaderStyle = 'html' | 'line'
+
+export function headerStyleFor(kind: PackFile['kind']): HeaderStyle {
+  return kind === 'script' ? 'line' : 'html'
 }
 
-const HEADER_REGEX =
+export function packHeader(
+  name: string,
+  version: string,
+  hash: string,
+  style: HeaderStyle = 'html',
+): string {
+  const lines = [
+    `the-anchoring:pack ${name}@${version} hash:${hash}`,
+    `Seeded by \`kb pack add ${name}\`. Edit freely — \`kb pack check\` will report it as`,
+    'hand-edited rather than overwrite it.',
+  ]
+  if (style === 'line') {
+    return lines.map((l) => `// ${l}`).join('\n')
+  }
+  return [`<!-- ${lines[0]} -->`, `<!-- ${lines[1]}`, `     ${lines[2]} -->`].join('\n')
+}
+
+const HTML_HEADER_REGEX =
   /^<!-- the-anchoring:pack ([^@\s]+)@(\S+) hash:([0-9a-f]{16}) -->\r?\n<!--[\s\S]*?-->\r?\n\r?\n?/
+const LINE_HEADER_REGEX =
+  /^\/\/ the-anchoring:pack ([^@\s]+)@(\S+) hash:([0-9a-f]{16})\r?\n(?:\/\/[^\n]*\r?\n)*\r?\n?/
+const SHEBANG_REGEX = /^#![^\n]*\r?\n/
+
+/**
+ * A shebang must stay the first line of a file, so the header goes *after* it.
+ *
+ * Emission and stripping are exact inverses: whatever `renderPackFile` puts together,
+ * `stripPackHeader` must take apart into the original body, or a seeded file compares
+ * unequal to its own pack and reports `stale` forever.
+ */
+export function renderPackFile(body: string, header: string): string {
+  const shebang = body.match(SHEBANG_REGEX)?.[0]
+  if (shebang) {
+    return `${shebang}${header}\n\n${body.slice(shebang.length)}`
+  }
+  return `${header}\n\n${body}`
+}
 
 export function stripPackHeader(content: string): {
   readonly header?: { readonly name: string; readonly version: string; readonly hash: string }
   readonly body: string
 } {
-  const match = content.match(HEADER_REGEX)
+  const shebang = content.match(SHEBANG_REGEX)?.[0] ?? ''
+  const rest = content.slice(shebang.length)
+  const match = rest.match(HTML_HEADER_REGEX) ?? rest.match(LINE_HEADER_REGEX)
   if (!match || !match[1] || !match[2] || !match[3]) {
     return { body: content }
   }
@@ -135,13 +181,16 @@ export function stripPackHeader(content: string): {
       version: match[2],
       hash: match[3],
     },
-    body: content.slice(match[0].length),
+    body: shebang + rest.slice(match[0].length),
   }
 }
 
 export function targetPathForFile(kind: PackFile['kind'], basename: string, config: AnchoringConfig): string {
   if (kind === 'invariant') return `${config.kinds.INV.dir}/${basename}`
   if (kind === 'hazard') return `${config.kinds.HAZ.dir}/${basename}`
+  // `scripts/` is repo-relative and outside `kbRoot` on purpose: a checker is code the
+  // adopter runs, and the `enforced_by:` anchors that point at it are written that way.
+  if (kind === 'script') return `scripts/${basename}`
   return `${config.kbRoot}/doctrine/${basename}`
 }
 
@@ -204,8 +253,13 @@ export function planPack(
 
     const actual = existing(destPath)
     const hash = packHash(file.body)
-    const header = packHeader(pack.manifest.name, pack.manifest.version, hash)
-    const body = `${header}\n\n${file.body}`
+    const header = packHeader(
+      pack.manifest.name,
+      pack.manifest.version,
+      hash,
+      headerStyleFor(file.kind),
+    )
+    const body = renderPackFile(file.body, header)
 
     if (actual === undefined) {
       files.push({ path: destPath, body })

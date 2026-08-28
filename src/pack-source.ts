@@ -52,7 +52,14 @@ export function userPackDirs(
   return dirs
 }
 
-function readMarkdownFiles(dir: string, kind: PackFile['kind']): readonly PackFile[] {
+const MARKDOWN_EXTENSIONS = ['.md'] as const
+const SCRIPT_EXTENSIONS = ['.mjs', '.js', '.cjs'] as const
+
+function readPackFiles(
+  dir: string,
+  kind: PackFile['kind'],
+  extensions: readonly string[],
+): readonly PackFile[] {
   if (!existsSync(dir)) return []
   const files: PackFile[] = []
   let entries: readonly string[]
@@ -63,7 +70,11 @@ function readMarkdownFiles(dir: string, kind: PackFile['kind']): readonly PackFi
   }
 
   for (const entry of entries) {
-    if (!entry.endsWith('.md') || entry.startsWith('0000-template') || entry.startsWith('.')) {
+    if (
+      !extensions.some((ext) => entry.endsWith(ext)) ||
+      entry.startsWith('0000-template') ||
+      entry.startsWith('.')
+    ) {
       continue
     }
     const fullPath = join(dir, entry)
@@ -104,9 +115,10 @@ export function loadPack(
   }
 
   const files: PackFile[] = [
-    ...readMarkdownFiles(join(absDir, 'invariant'), 'invariant'),
-    ...readMarkdownFiles(join(absDir, 'hazard'), 'hazard'),
-    ...readMarkdownFiles(join(absDir, 'doctrine'), 'doctrine'),
+    ...readPackFiles(join(absDir, 'invariant'), 'invariant', MARKDOWN_EXTENSIONS),
+    ...readPackFiles(join(absDir, 'hazard'), 'hazard', MARKDOWN_EXTENSIONS),
+    ...readPackFiles(join(absDir, 'doctrine'), 'doctrine', MARKDOWN_EXTENSIONS),
+    ...readPackFiles(join(absDir, 'scripts'), 'script', SCRIPT_EXTENSIONS),
   ]
 
   return {

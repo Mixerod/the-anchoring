@@ -1,4 +1,4 @@
-<!-- the-anchoring:pack discipline@1.0.0 hash:f9ff901f901dd1d4 -->
+<!-- the-anchoring:pack discipline@1.1.0 hash:f9ff901f901dd1d4 -->
 <!-- Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
      hand-edited rather than overwrite it. -->
 

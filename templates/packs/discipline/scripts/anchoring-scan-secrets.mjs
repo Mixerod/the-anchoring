@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// the-anchoring:pack discipline@1.1.0 hash:14902f2ea1a8c0d5
-// Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
-// hand-edited rather than overwrite it.
-
 /* global process, console */
 /**
  * Secret scanner for Tier 1 structured token formats.

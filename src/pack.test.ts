@@ -11,6 +11,9 @@ import {
   packHash,
   packHeader,
   stripPackHeader,
+  renderPackFile,
+  headerStyleFor,
+  targetPathForFile,
   planPack,
   checkPack,
   type Pack,
@@ -312,8 +315,8 @@ describe('CLI kb pack commands and init --pack integration', () => {
     const err: string[] = []
     const code = run(['pack', 'list', '--no-colour'], (t) => out.push(t), (t) => err.push(t))
     expect(code).toBe(0)
-    expect(out.join('\n')).toContain('discipline (1.0.0)')
-    expect(out.join('\n')).toContain('1 invariant, 5 doctrines, 2 hazards')
+    expect(out.join('\n')).toContain('discipline (1.1.0)')
+    expect(out.join('\n')).toContain('1 invariant, 5 doctrines, 2 hazards, 1 script')
   })
 
   test('kb pack add discipline --dry-run prints would write and does not write', () => {
@@ -367,5 +370,60 @@ describe('CLI kb pack commands and init --pack integration', () => {
     const agentsMd = readFileSync(join(root, 'AGENTS.md'), 'utf8')
     expect(agentsMd).toContain('## Engineering doctrine')
     expect(agentsMd).toContain('module-boundaries.md')
+  })
+})
+
+/**
+ * A pack that ships an invariant must be able to ship its checker, or every adopter's
+ * `enforced_by:` anchor dangles the moment they seed it. These are the tests where that
+ * must speak.
+ */
+describe('script files in a pack', () => {
+  const SHEBANG_SCRIPT = '#!/usr/bin/env node\nconsole.log("scan")\n'
+
+  test('a script lands in scripts/, outside kbRoot', () => {
+    const config = defaultConfig('/repo')
+    expect(targetPathForFile('script', 'anchoring-scan-secrets.mjs', config)).toBe(
+      'scripts/anchoring-scan-secrets.mjs',
+    )
+  })
+
+  test('a script gets a line-comment header, never an HTML one', () => {
+    expect(headerStyleFor('script')).toBe('line')
+    expect(headerStyleFor('invariant')).toBe('html')
+    const header = packHeader('discipline', '1.1.0', packHash(SHEBANG_SCRIPT), 'line')
+    expect(header.startsWith('// the-anchoring:pack discipline@1.1.0')).toBe(true)
+    expect(header).not.toContain('<!--')
+  })
+
+  test('the shebang stays the first line, with the header below it', () => {
+    const header = packHeader('discipline', '1.1.0', packHash(SHEBANG_SCRIPT), 'line')
+    const rendered = renderPackFile(SHEBANG_SCRIPT, header)
+    expect(rendered.split('\n')[0]).toBe('#!/usr/bin/env node')
+    expect(rendered.split('\n')[1]).toContain('the-anchoring:pack')
+  })
+
+  test('render then strip round-trips to the original body', () => {
+    for (const body of [SHEBANG_SCRIPT, 'console.log("no shebang")\n']) {
+      const header = packHeader('discipline', '1.1.0', packHash(body), 'line')
+      const parsed = stripPackHeader(renderPackFile(body, header))
+      expect(parsed.header?.name).toBe('discipline')
+      expect(parsed.body).toBe(body)
+    }
+  })
+
+  test('a seeded script reports ok, not stale — the hash survives the shebang split', () => {
+    const config = defaultConfig('/repo')
+    const pack: Pack = {
+      manifest: { name: 'discipline', version: '1.1.0', description: 'd' },
+      files: [{ kind: 'script', basename: 'scan.mjs', body: SHEBANG_SCRIPT }],
+      origin: '/packs/discipline',
+    }
+    const plan = planPack(pack, config, () => undefined)
+    const written = new Map(plan.files.map((f) => [f.path, f.body]))
+    expect([...written.keys()]).toEqual(['scripts/scan.mjs'])
+
+    const check = checkPack(pack, config, (p) => written.get(p))
+    expect(check.files.map((f) => f.state)).toEqual(['ok'])
   })
 })

@@ -28,10 +28,13 @@ function handleList(
     const invs = pack.files.filter((f) => f.kind === 'invariant').length
     const docs = pack.files.filter((f) => f.kind === 'doctrine').length
     const hazs = pack.files.filter((f) => f.kind === 'hazard').length
+    const scripts = pack.files.filter((f) => f.kind === 'script').length
     log(`${pack.manifest.name} (${pack.manifest.version})`)
     log(`  source:       ${pack.origin}`)
     log(`  description:  ${pack.manifest.description}`)
-    log(`  contents:     ${invs} invariant, ${docs} doctrines, ${hazs} hazards`)
+    log(
+      `  contents:     ${invs} invariant, ${docs} doctrines, ${hazs} hazards, ${scripts} script`,
+    )
   }
   return 0
 }
