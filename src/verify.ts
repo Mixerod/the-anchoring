@@ -196,6 +196,32 @@ export function checkTags(entity: Entity): readonly Finding[] {
   return findings
 }
 
+/**
+ * The body budget.
+ *
+ * **A warning under every flag, including `--strict`. Never an error, ever.** A build that
+ * goes red because a document is verbose is a build people learn to bypass, and the checks
+ * that matter get bypassed along with it — rule 8. If you are here to promote this to an
+ * error, the thing you would be breaking is every other check in this file.
+ *
+ * An unmeasured body (`bodyBytes` absent) is not reported: "we did not look" and "it is
+ * within budget" are different facts, and silently merging them is how a gate starts lying.
+ */
+export function checkBodyBudget(entity: Entity, maxBodyBytes: number): readonly Finding[] {
+  const bytes = entity.bodyBytes
+  if (bytes === undefined || bytes <= maxBodyBytes) return []
+
+  return [
+    {
+      severity: 'warn',
+      advisory: true,
+      where: `${entity.id} · body`,
+      message: `body is ${bytes} bytes, ${bytes - maxBodyBytes} over the ${maxBodyBytes}-byte budget`,
+      hint: 'every agent reads this on every cold start; split it or cut it, or raise maxBodyBytes deliberately',
+    },
+  ]
+}
+
 export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyReport {
   const store = loadStore(config)
   const resolver = createResolver(config)
@@ -214,6 +240,7 @@ export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyR
     findings.push(...checkHazard(entity, now, config.hazard))
     findings.push(...checkOwner(entity))
     findings.push(...checkTags(entity))
+    findings.push(...checkBodyBudget(entity, config.maxBodyBytes))
     findings.push(...checkUpstream(entity, config, now))
     const anchors = checkAnchors(entity, resolver)
     findings.push(...anchors.findings)

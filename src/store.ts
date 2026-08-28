@@ -6,7 +6,7 @@
  */
 
 import { LINK_FIELDS, SCALAR_FIELDS, kindOf, type EntityKind } from './model.js'
-import { parseFrontmatter, toList } from './frontmatter.js'
+import { parseFrontmatter, toList, bodyAfterFrontmatter, byteLength } from './frontmatter.js'
 import type { AnchoringConfig } from './config.js'
 
 export interface Entity {
@@ -19,6 +19,14 @@ export interface Entity {
   readonly links: Readonly<Record<string, readonly string[]>>
   /** Non-link frontmatter declared in SCALAR_FIELDS, absent when the document omits it. */
   readonly fields: Readonly<Record<string, string>>
+  /**
+   * UTF-8 size of the prose after the frontmatter fence.
+   *
+   * Carried on the entity because the raw text is already in hand at parse time, so the
+   * body budget costs no second read. Optional so that a hand-built entity in a test need
+   * not invent a number it does not care about; absent means "not measured", never zero.
+   */
+  readonly bodyBytes?: number
 }
 
 /**
@@ -84,7 +92,16 @@ export function parseEntity(
     if (value !== undefined && value !== null) fields[name] = scalar(value)
   }
 
-  return { id, kind: expected, title, status, path: relPath, links, fields }
+  return {
+    id,
+    kind: expected,
+    title,
+    status,
+    path: relPath,
+    links,
+    fields,
+    bodyBytes: byteLength(bodyAfterFrontmatter(rawText)),
+  }
 }
 
 export function buildStore(

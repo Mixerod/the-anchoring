@@ -19,6 +19,9 @@ import {
 import { readSessionNote, writeSessionNote } from './session.js'
 import { gitChangedSince, type ChangedSince } from './git.js'
 import { renderVerify, renderSince, type Palette } from './render.js'
+import { planBrief } from './brief.js'
+import { readBriefInput } from './brief-source.js'
+import { corpusStats, renderStats } from './render-stats.js'
 import type { AnchoringConfig } from './config.js'
 import type { Finding } from './finding.js'
 
@@ -31,11 +34,18 @@ function flagValue(rest: readonly string[], flag: string): string | undefined {
   return inline?.slice(flag.length + 1)
 }
 
-/** Exit code: errors always fail; warnings fail only under `--strict`. */
+/**
+ * Exit code: errors always fail; warnings fail only under `--strict`; advisory findings
+ * never fail, under any flag.
+ *
+ * The third clause is the one to leave alone. The body budget is advisory by construction —
+ * a verbose document is a cost, not a defect — and a red build over one is a build somebody
+ * routes around. See `Finding.advisory` and rule 8.
+ */
 export function exitCodeFor(findings: readonly Finding[], strict: boolean): number {
   const errors = findings.filter((f) => f.severity === 'error').length
-  const warnings = findings.length - errors
-  return errors > 0 || (strict && warnings > 0) ? 1 : 0
+  const gatingWarnings = findings.filter((f) => f.severity === 'warn' && !f.advisory).length
+  return errors > 0 || (strict && gatingWarnings > 0) ? 1 : 0
 }
 
 function runSince(
@@ -105,5 +115,13 @@ export function verifyCommand(
   }
 
   out(renderVerify(report, palette))
+
+  // Under --strict only. `kb verify` runs on every turn; reading every body to weigh the
+  // corpus on each of them would be a cost added to fix a cost, and rule 10 forbids that.
+  if (strict) {
+    const input = readBriefInput(config)
+    out(renderStats(corpusStats(planBrief(input), input)))
+  }
+
   return exitCodeFor(report.findings, strict)
 }

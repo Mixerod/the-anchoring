@@ -39,6 +39,8 @@ export interface AnchoringConfig {
   readonly governedPaths: readonly string[]
   readonly hazard: { readonly openDays: number; readonly ceiling: number }
   readonly symbolIndex: 'codegraph' | 'none'
+  /** Warn above this many UTF-8 bytes of entity body. Never an error — see checkBodyBudget. */
+  readonly maxBodyBytes: number
   readonly sessionFile: string              // derived: `${kbRoot}/session/current`
   readonly architecture?: Architecture
 }
@@ -102,6 +104,13 @@ export const DEFAULT_HAZARD = {
 
 export const DEFAULT_SYMBOL_INDEX: 'codegraph' | 'none' = 'codegraph'
 
+/**
+ * Entity bodies are the bulk of the corpus and nothing else bounds them. `src/` has
+ * `maxFileLines`; a doctrine file may grow to any size, and every agent pays for it on every
+ * cold start, forever.
+ */
+export const DEFAULT_MAX_BODY_BYTES = 6000
+
 function defaultKinds(kbRoot: string): Record<EntityKind, KindSpec> {
   const kinds = {} as Record<EntityKind, KindSpec>
   for (const k of ENTITY_KINDS) {
@@ -124,6 +133,7 @@ export function defaultConfig(root: string): AnchoringConfig {
     governedPaths: DEFAULT_GOVERNED_PATHS,
     hazard: DEFAULT_HAZARD,
     symbolIndex: DEFAULT_SYMBOL_INDEX,
+    maxBodyBytes: DEFAULT_MAX_BODY_BYTES,
     sessionFile: `${kbRoot}/session/current`,
   }
 }
@@ -134,6 +144,7 @@ const KNOWN_TOP_KEYS = [
   'governedPaths',
   'hazard',
   'symbolIndex',
+  'maxBodyBytes',
   'architecture',
 ] as const
 const KNOWN_KIND_KEYS = ['dir', 'idPattern', 'statuses'] as const
@@ -342,6 +353,19 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
     }
   }
 
+  let maxBodyBytes = DEFAULT_MAX_BODY_BYTES
+  if (rawObj['maxBodyBytes'] !== undefined) {
+    if (
+      typeof rawObj['maxBodyBytes'] !== 'number' ||
+      !Number.isInteger(rawObj['maxBodyBytes']) ||
+      rawObj['maxBodyBytes'] <= 0
+    ) {
+      problems.push('`maxBodyBytes` must be a positive integer')
+    } else {
+      maxBodyBytes = rawObj['maxBodyBytes']
+    }
+  }
+
   let architecture: Architecture | undefined
   if (rawObj['architecture'] !== undefined) {
     architecture = parseArchitecture(rawObj['architecture'], problems)
@@ -376,6 +400,7 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
       governedPaths,
       hazard,
       symbolIndex,
+      maxBodyBytes,
       sessionFile: `${kbRoot}/session/current`,
       ...(architecture !== undefined ? { architecture } : {}),
     },

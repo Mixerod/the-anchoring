@@ -35,6 +35,23 @@ export function parseFrontmatter(text: string): ParseResult {
   return { ok: true, data: parsed as Frontmatter }
 }
 
+/**
+ * Everything after the frontmatter fence — the prose an agent actually pays to read.
+ *
+ * Measured rather than parsed: the body's *size* is a budget, and nothing here needs to know
+ * what is in it. Returns the whole text when there is no fence, because a document that
+ * failed to parse still costs what it costs.
+ */
+export function bodyAfterFrontmatter(text: string): string {
+  const match = FENCE.exec(text)
+  return match ? text.slice(match[0].length) : text
+}
+
+/** UTF-8 bytes, which is what the file on disk and the request body are measured in. */
+export function byteLength(text: string): number {
+  return new TextEncoder().encode(text).length
+}
+
 /** Frontmatter list fields accept a bare scalar or a list; normalise to strings. */
 export function toList(value: unknown): readonly string[] {
   if (value === undefined || value === null) return []

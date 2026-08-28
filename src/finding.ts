@@ -13,6 +13,16 @@ export interface Finding {
   readonly where: string
   readonly message: string
   readonly hint?: string
+  /**
+   * Reported, never gating: excluded from the exit code even under `--strict`.
+   *
+   * For checks about cost and hygiene rather than correctness — a verbose document is not a
+   * broken one. Rule 8: an advisory gate reports and never fails the turn, because a build
+   * that goes red over bookkeeping is a build people learn to bypass, taking the checks that
+   * matter with it. `severity` stays `warn` so it still *prints*; silence would be worse
+   * than either.
+   */
+  readonly advisory?: boolean
 }
 
 export const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
