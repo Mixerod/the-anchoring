@@ -48,6 +48,8 @@ export interface BriefDocument {
   readonly id: string
   readonly path: string
   readonly body: string
+  /** Absent for AGENTS.md and doctrine, which are files rather than entities. */
+  readonly kind?: EntityKind
 }
 
 export interface BriefTier {
@@ -149,7 +151,12 @@ function entityDocuments(
   return selectors.flatMap((selector) =>
     entities
       .filter((e) => e.entity.kind === selector.kind && selector.includes(e.entity.status))
-      .map((e) => ({ id: e.entity.id, path: e.entity.path, body: normaliseBody(e.body) }))
+      .map((e) => ({
+        id: e.entity.id,
+        path: e.entity.path,
+        body: normaliseBody(e.body),
+        kind: e.entity.kind,
+      }))
       .sort((a, b) => byCodepoint(a.id, b.id)),
   )
 }

@@ -46,6 +46,7 @@
         "paths": [
           "src/render.ts",
           "src/render-brief.ts",
+          "src/render-stats.ts",
           "src/init.ts",
           "src/agents.ts"
         ]
