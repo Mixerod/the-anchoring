@@ -56,13 +56,39 @@ describe('renderVerify', () => {
     const text = renderVerify(
       report({
         indexed: false,
-        findings: [{ severity: 'warn', where: 'ADR-0003', message: 'sym:calculateCost unverifiable' }],
+        // `code` rather than a phrase in the message: the count used to be "every warning",
+        // which silently became wrong as soon as non-anchor warnings existed.
+        findings: [
+          {
+            severity: 'warn',
+            code: 'anchor-unverifiable',
+            where: 'ADR-0003',
+            message: 'sym:calculateCost unverifiable',
+          },
+        ],
       }),
       PLAIN,
     )
 
     expect(text).toContain('1 symbol anchor(s) unverified')
     expect(text).toContain('codegraph init')
+  })
+
+  test('stays quiet about codegraph when the warning is not about an anchor', () => {
+    // The case the old count got wrong: a tags or body-budget warning is not a reason to
+    // tell somebody an anchor went unchecked.
+    const text = renderVerify(
+      report({
+        indexed: false,
+        findings: [
+          { severity: 'warn', advisory: true, where: 'W-1 · tags', message: 'used exactly once' },
+        ],
+      }),
+      PLAIN,
+    )
+
+    expect(text).not.toContain('symbol anchor(s) unverified')
+    expect(text).not.toContain('codegraph init')
   })
 
   test('stays quiet about the index when nothing actually went unchecked', () => {

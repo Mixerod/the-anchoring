@@ -15,10 +15,11 @@ import { createResolver } from './resolver.js'
 import type { AnchoringConfig } from './config.js'
 import { checkHazard, checkHazardCeiling } from './verify-hazard.js'
 import { checkUpstream, checkUpstreamCeiling } from './verify-upstream.js'
+import { checkTags, checkTagVocabulary } from './verify-tags.js'
 import type { Finding, Severity } from './finding.js'
 
 export type { Finding, Severity }
-export { checkUpstream, checkHazard }
+export { checkUpstream, checkHazard, checkTags, checkTagVocabulary }
 
 export interface VerifyReport {
   readonly findings: readonly Finding[]
@@ -76,6 +77,7 @@ function checkAnchors(entity: Entity, resolver: Resolver): { findings: readonly 
 
       findings.push({
         severity: result.status === 'unverifiable' ? 'warn' : 'error',
+        ...(result.status === 'unverifiable' ? { code: 'anchor-unverifiable' as const } : {}),
         where: `${entity.id} · ${field}`,
         message: `anchor \`${raw}\` — ${result.detail ?? result.status}`,
         ...(result.status === 'missing'
@@ -157,45 +159,6 @@ function checkOwner(entity: Entity): readonly Finding[] {
   return []
 }
 
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-
-export function checkTags(entity: Entity): readonly Finding[] {
-  const raw = entity.fields['tags']
-  if (raw === undefined) return []
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    parsed = undefined
-  }
-
-  if (!Array.isArray(parsed)) {
-    return [
-      {
-        severity: 'error',
-        where: `${entity.id} · tags`,
-        message: `\`${raw}\` must be a list of lowercase slugs`,
-        hint: 'tags must be formatted as a YAML list of lowercase slugs, e.g. [foo, bar]',
-      },
-    ]
-  }
-
-  const findings: Finding[] = []
-  for (const item of parsed) {
-    const str = typeof item === 'string' ? item : String(item)
-    if (typeof item !== 'string' || !SLUG_PATTERN.test(item)) {
-      findings.push({
-        severity: 'error',
-        where: `${entity.id} · tags`,
-        message: `\`${str}\` is not a lowercase slug`,
-        hint: 'a tag must contain only lowercase letters, numbers, and hyphens',
-      })
-    }
-  }
-  return findings
-}
-
 /**
  * The body budget.
  *
@@ -249,6 +212,7 @@ export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyR
 
   findings.push(...checkHazardCeiling(store, config.hazard.ceiling))
   findings.push(...checkUpstreamCeiling(store))
+  findings.push(...checkTagVocabulary(store, config.tags))
 
   return { findings, entityCount: store.byId.size, anchorCount, indexed: resolver.indexed }
 }

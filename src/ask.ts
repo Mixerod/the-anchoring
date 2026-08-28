@@ -14,6 +14,7 @@
  */
 
 import { type Entity, type Store } from './store.js'
+import type { EntityKind } from './model.js'
 import { loadStore, loadDoctrine, type DoctrineSummary } from './loader.js'
 import type { AnchoringConfig } from './config.js'
 
@@ -130,6 +131,33 @@ export type RankedKind = (typeof RANKED_KINDS)[number]
 
 export const DEFAULT_ASK_LIMIT = 8
 
+export interface HazardExclusion {
+  readonly resolution: string
+  readonly count: number
+}
+
+/**
+ * What the query did **not** return, and why.
+ *
+ * A filter whose rejections are invisible cannot be audited, and an unauditable filter is
+ * trusted right up until it is ignored. Counts and reasons only — never the excluded
+ * entities themselves, which would reintroduce exactly the token cost Layer 5 exists to
+ * remove.
+ */
+export interface AskExclusions {
+  /** Entities the ranker actually scored. */
+  readonly searched: number
+  readonly scoredZero: number
+  /** Matches dropped by `--limit`: found, ranked, and then not shown. */
+  readonly truncated: number
+  /** Active hazards held back because their author already decided what to do. */
+  readonly hazards: readonly HazardExclusion[]
+  readonly retiredInvariants: number
+  readonly supersededDecisions: number
+  /** Returned in full rather than ranked, so never scored against the query. */
+  readonly alwaysReturned: readonly EntityKind[]
+}
+
 export interface AskReport {
   readonly query: string
   readonly corpusSize: number
@@ -138,11 +166,36 @@ export interface AskReport {
   readonly ranked: Readonly<Record<RankedKind, readonly RankedMatch[]>>
   readonly totalMatches: number
   readonly doctrine: readonly DoctrineSummary[]
+  readonly exclusions: AskExclusions
 }
 
 export interface AskOptions {
   readonly limit?: number
   readonly doctrine?: readonly DoctrineSummary[]
+}
+
+/**
+ * A decision that has been replaced is not guidance, so it is not ranked.
+ *
+ * Note what this does *not* touch: invariants and open hazards are still returned in full,
+ * every time. An invariant that applies only when a keyword matches is not an invariant, and
+ * an unread hazard is worse than none — which is why there is a clock on them. The
+ * temptation, once exclusion counts exist, is to start trimming those too.
+ */
+const isRankable = (entity: Entity): boolean =>
+  !(entity.kind === 'ADR' && (entity.status === 'superseded' || entity.status === 'void'))
+
+function hazardExclusions(entities: readonly Entity[]): readonly HazardExclusion[] {
+  const counts = new Map<string, number>()
+  for (const e of entities) {
+    if (e.kind !== 'HAZ' || e.status !== 'active') continue
+    const resolution = e.fields['resolution'] ?? 'unrecorded'
+    if (resolution === 'open') continue
+    counts.set(resolution, (counts.get(resolution) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .map(([resolution, count]) => ({ resolution, count }))
+    .sort((a, b) => (a.resolution < b.resolution ? -1 : a.resolution > b.resolution ? 1 : 0))
 }
 
 export function askStore(
@@ -166,6 +219,8 @@ export function askStore(
 
   // 3. Ranked matches for ADR, FLOW, WORK, INC
   let totalMatches = 0
+  let searched = 0
+  let truncated = 0
   const ranked: Record<RankedKind, readonly RankedMatch[]> = {
     ADR: [],
     FLOW: [],
@@ -174,7 +229,8 @@ export function askStore(
   }
 
   for (const kind of RANKED_KINDS) {
-    const candidates = allEntities.filter((e) => e.kind === kind)
+    const candidates = allEntities.filter((e) => e.kind === kind && isRankable(e))
+    searched += candidates.length
     const scored: RankedMatch[] = []
 
     for (const entity of candidates) {
@@ -188,6 +244,7 @@ export function askStore(
     scored.sort((a, b) => (b.score !== a.score ? b.score - a.score : a.entity.id.localeCompare(b.entity.id)))
     totalMatches += scored.length
     ranked[kind] = scored.slice(0, limit)
+    truncated += Math.max(0, scored.length - limit)
   }
 
   return {
@@ -198,6 +255,15 @@ export function askStore(
     ranked,
     totalMatches,
     doctrine: options.doctrine ?? [],
+    exclusions: {
+      searched,
+      scoredZero: searched - totalMatches,
+      truncated,
+      hazards: hazardExclusions(allEntities),
+      retiredInvariants: allEntities.filter((e) => e.kind === 'INV' && e.status !== 'active').length,
+      supersededDecisions: allEntities.filter((e) => e.kind === 'ADR' && !isRankable(e)).length,
+      alwaysReturned: ['INV', 'HAZ'],
+    },
   }
 }
 

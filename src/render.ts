@@ -95,9 +95,17 @@ export function renderVerify(report: VerifyReport, c: Palette = COLOUR): string 
 
   // Only mention the index when something actually went unchecked because of it.
   // Printing it on every clean run would train the reader to skip the last line.
-  if (!report.indexed && warnings.length > 0) {
+  //
+  // Counts *unverifiable anchors*, not warnings. Those were the same set until Layer 5 added
+  // warnings about tags and body size; counting all of them made this line report "1 symbol
+  // anchor(s) unverified" on a run where none were - a message worse than absent, because it
+  // sends the reader to install a tool that would not have helped. Matched on `code` rather
+  // than on the message text: a renderer that infers a category from prose breaks silently
+  // the next time somebody rewords a message.
+  const unverified = warnings.filter((f) => f.code === 'anchor-unverifiable').length
+  if (!report.indexed && unverified > 0) {
     lines.push(
-      `${c.dim}${warnings.length} symbol anchor(s) unverified - run \`codegraph init\` to check them.${c.off}`,
+      `${c.dim}${unverified} symbol anchor(s) unverified - run \`codegraph init\` to check them.${c.off}`,
     )
   }
   return lines.join('\n')
@@ -343,6 +351,44 @@ export function renderAsk(report: AskReport, c: Palette = COLOUR): string {
     }
   }
 
+  lines.push(...renderExclusions(report, c))
   return lines.join('\n')
+}
+
+/**
+ * What the query did not return.
+ *
+ * `kb ask` used to report only what it found. A filter whose rejections are invisible cannot
+ * be audited, and an unauditable filter is trusted right up until it is ignored — so the
+ * other half is printed too.
+ *
+ * Counts and reasons, one line each, never the excluded entities themselves. Listing them
+ * would reintroduce precisely the token cost this layer exists to remove.
+ */
+function renderExclusions(report: AskReport, c: Palette): readonly string[] {
+  const x = report.exclusions
+  const lines = ['', `${c.bold}Not shown${c.off}`]
+
+  lines.push(
+    `  ${c.dim}searched ${x.searched} entities; ${x.scoredZero} scored zero${c.off}`,
+  )
+  if (x.truncated > 0) {
+    lines.push(`  ${c.dim}${x.truncated} further match(es) ranked below the limit${c.off}`)
+  }
+  for (const hazard of x.hazards) {
+    lines.push(
+      `  ${c.dim}${hazard.count} hazard(s) held back: resolution \`${hazard.resolution}\` - already decided${c.off}`,
+    )
+  }
+  if (x.retiredInvariants > 0) {
+    lines.push(`  ${c.dim}${x.retiredInvariants} retired invariant(s) excluded${c.off}`)
+  }
+  if (x.supersededDecisions > 0) {
+    lines.push(`  ${c.dim}${x.supersededDecisions} superseded decision(s) excluded${c.off}`)
+  }
+  lines.push(
+    `  ${c.dim}${x.alwaysReturned.join(' and ')} are returned in full, never ranked${c.off}`,
+  )
+  return lines
 }
 

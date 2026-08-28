@@ -209,7 +209,15 @@ describe('tags field validation on all six kinds (Layer 4 Part B)', () => {
     )
 
     const report = verify(conf(root))
-    expect(report.findings).toEqual([])
+
+    // No errors: well-formed slugs are accepted on every kind, which is what this test is
+    // about. Layer 5 added a second, corpus-level pass, and every tag in this fixture is
+    // used exactly once — so it now also produces advisory singleton warnings. Those are
+    // asserted rather than ignored: a check that fires here and goes unmentioned is a check
+    // somebody deletes later believing it was noise.
+    expect(report.findings.filter((f) => f.severity === 'error')).toEqual([])
+    expect(report.findings.every((f) => f.advisory === true)).toBe(true)
+    expect(report.findings.every((f) => f.message.includes('used exactly once'))).toBe(true)
     expect(report.entityCount).toBe(6)
   })
 

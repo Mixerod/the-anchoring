@@ -115,21 +115,14 @@ function renderHazardFrontmatter(
     'resolves_to: []',
   ]
 
-  const rawTags = incident.fields['tags']
-  if (rawTags) {
-    try {
-      const parsed = JSON.parse(rawTags)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        lines.push('tags:')
-        for (const tag of parsed) {
-          lines.push(`  - ${String(tag)}`)
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
+  // Tags are deliberately **not** carried across, for the same reason local anchors and
+  // paths are not: they describe the origin repository, not the hazard.
+  //
+  // A tag is a retrieval hint against one corpus's vocabulary. Copied into somebody else's
+  // repository it matches nothing there, and — since a promoted tag is used exactly once in
+  // its new home by construction — it trips the singleton check on the adopter's very first
+  // `kb verify`. A pack that arrives making noise about vocabulary the adopter never chose
+  // is a pack they stop installing. See templates/packs/discipline/doctrine/tags-are-hints.md.
   lines.push(`promoted_from: ${incident.id}`)
   lines.push('---')
   return lines.join('\n')

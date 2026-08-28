@@ -315,8 +315,9 @@ describe('CLI kb pack commands and init --pack integration', () => {
     const err: string[] = []
     const code = run(['pack', 'list', '--no-colour'], (t) => out.push(t), (t) => err.push(t))
     expect(code).toBe(0)
-    expect(out.join('\n')).toContain('discipline (1.1.0)')
-    expect(out.join('\n')).toContain('1 invariant, 5 doctrines, 2 hazards, 1 script')
+    // 1.2.0 adds doctrine/tags-are-hints.md alongside the Layer 5 tag checker.
+    expect(out.join('\n')).toContain('discipline (1.2.0)')
+    expect(out.join('\n')).toContain('1 invariant, 6 doctrines, 2 hazards, 1 script')
   })
 
   test('kb pack add discipline --dry-run prints would write and does not write', () => {

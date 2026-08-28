@@ -26,6 +26,18 @@ export {
   DEFAULT_IMPURE_IMPORTS,
 }
 
+/**
+ * Optional closed vocabulary for `tags:`.
+ *
+ * Declared here rather than beside its checker because `AnchoringConfig` must not import a
+ * checker: `verify-tags.ts` reads the store, the store reads the config, and a type import
+ * the other way closes the loop. `depcruise` caught it, which is the whole reason the
+ * no-circular rule exists.
+ */
+export interface TagsConfig {
+  readonly vocabulary?: readonly string[]
+}
+
 export interface KindSpec {
   readonly dir: string                      // repo-relative, forward slashes
   readonly idPattern: RegExp
@@ -41,6 +53,11 @@ export interface AnchoringConfig {
   readonly symbolIndex: 'codegraph' | 'none'
   /** Warn above this many UTF-8 bytes of entity body. Never an error — see checkBodyBudget. */
   readonly maxBodyBytes: number
+  /**
+   * Optional closed vocabulary for `tags:`. Absent means the singleton default applies.
+   * See verify-tags.ts for why the two modes differ in severity.
+   */
+  readonly tags?: TagsConfig
   readonly sessionFile: string              // derived: `${kbRoot}/session/current`
   readonly architecture?: Architecture
 }
@@ -145,8 +162,10 @@ const KNOWN_TOP_KEYS = [
   'hazard',
   'symbolIndex',
   'maxBodyBytes',
+  'tags',
   'architecture',
 ] as const
+const KNOWN_TAGS_KEYS = ['vocabulary'] as const
 const KNOWN_KIND_KEYS = ['dir', 'idPattern', 'statuses'] as const
 const KNOWN_HAZARD_KEYS = ['openDays', 'ceiling'] as const
 
@@ -154,6 +173,42 @@ export type ConfigProblems = readonly string[]
 export type ConfigResult =
   | { readonly ok: true; readonly config: AnchoringConfig }
   | { readonly ok: false; readonly problems: ConfigProblems }
+
+/**
+ * Declaring an *empty* vocabulary is rejected rather than silently accepted.
+ *
+ * It would otherwise read as "no vocabulary" while meaning "every tag is an error" — two
+ * opposite behaviours one keystroke apart, with nothing to tell them apart at a glance.
+ */
+function parseTags(raw: unknown, problems: string[]): TagsConfig | undefined {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    problems.push('`tags` must be an object')
+    return undefined
+  }
+
+  const rawTags = raw as Record<string, unknown>
+  for (const key of Object.keys(rawTags)) {
+    if (!KNOWN_TAGS_KEYS.includes(key as (typeof KNOWN_TAGS_KEYS)[number])) {
+      problems.push(
+        `unknown key \`${key}\` under \`tags\`; accepted keys are: ${KNOWN_TAGS_KEYS.join(', ')}`,
+      )
+    }
+  }
+
+  if (rawTags['vocabulary'] === undefined) return {}
+
+  const vocabulary = rawTags['vocabulary']
+  if (
+    !Array.isArray(vocabulary) ||
+    vocabulary.length === 0 ||
+    vocabulary.some((t: unknown) => typeof t !== 'string' || t.trim() === '')
+  ) {
+    problems.push('`tags.vocabulary` must be a non-empty array of non-empty strings')
+    return undefined
+  }
+
+  return { vocabulary: vocabulary as readonly string[] }
+}
 
 export function parseConfig(root: string, raw: unknown): ConfigResult {
   const problems: string[] = []
@@ -366,6 +421,11 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
     }
   }
 
+  let tags: TagsConfig | undefined
+  if (rawObj['tags'] !== undefined) {
+    tags = parseTags(rawObj['tags'], problems)
+  }
+
   let architecture: Architecture | undefined
   if (rawObj['architecture'] !== undefined) {
     architecture = parseArchitecture(rawObj['architecture'], problems)
@@ -401,6 +461,7 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
       hazard,
       symbolIndex,
       maxBodyBytes,
+      ...(tags !== undefined ? { tags } : {}),
       sessionFile: `${kbRoot}/session/current`,
       ...(architecture !== undefined ? { architecture } : {}),
     },

@@ -73,6 +73,7 @@
           "src/ask.ts",
           "src/pack.ts",
           "src/promote.ts",
+          "src/verify-tags.ts",
           "src/brief.ts",
           "src/since.ts",
           "src/fingerprint.ts",

@@ -23,6 +23,17 @@ export interface Finding {
    * than either.
    */
   readonly advisory?: boolean
+  /**
+   * A stable machine-readable label for findings a renderer must single out.
+   *
+   * Added because `renderVerify` was deciding "is this an unverifiable symbol anchor?" by
+   * counting *all* warnings. That was true only while anchors were the only warning; once
+   * Layer 5 added warnings about tags and body size, a clean run started reporting
+   * "1 symbol anchor(s) unverified" and pointing the reader at a tool that would not have
+   * helped. A renderer that infers a finding's category from its prose breaks whenever a new
+   * check is added, and breaks silently.
+   */
+  readonly code?: 'anchor-unverifiable'
 }
 
 export const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
