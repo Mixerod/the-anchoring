@@ -14,7 +14,7 @@ import { LINK_FIELDS } from './model.js'
 import { type Entity, type Store } from './store.js'
 import { loadStore } from './loader.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
-import { parseAnchor } from './anchors.js'
+import { anchorCovers as covers, parseAnchor } from './anchors.js'
 import { openLoopNotices } from './upstream.js'
 import type { AnchoringConfig } from './config.js'
 
@@ -62,9 +62,6 @@ function anchorPaths(entity: Entity): readonly string[] {
       return anchor?.form === 'file' ? [anchor.value] : []
     })
 }
-
-const covers = (anchor: string, file: string): boolean =>
-  anchor === file || file.startsWith(`${anchor}/`)
 
 function decisionGaps(work: Entity, changed: readonly string[], store: Store): readonly Gap[] {
   const claimed = new Set(work.links['implements'] ?? [])

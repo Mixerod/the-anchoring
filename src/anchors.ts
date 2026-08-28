@@ -38,6 +38,25 @@ export function parseAnchor(raw: string): Anchor | undefined {
   return undefined
 }
 
+/**
+ * Whether a `file:` anchor's value covers a path from a diff.
+ *
+ * The trailing slash is the whole subtlety, and getting it wrong was a live defect: the
+ * obvious `file.startsWith(`${anchor}/`)` builds `src//` for the directory anchor
+ * `file:src/`, which matches nothing. `INV-SECRETS-NO-LITERALS` holds for `file:src/`, and
+ * `kb done` was nonetheless reporting "no document explains: src/upstream.ts" — a gate
+ * crying wolf about a file that was anchored all along. A check that reports a false
+ * positive on ordinary work is a check people learn to scroll past, which costs more than
+ * the check was ever worth.
+ *
+ * Lives here rather than in either caller because `done.ts` and `since.ts` both need it and
+ * a rule kept in two places is a rule maintained in neither.
+ */
+export function anchorCovers(anchor: string, file: string): boolean {
+  const base = anchor.endsWith('/') ? anchor.slice(0, -1) : anchor
+  return base === file || file.startsWith(`${base}/`)
+}
+
 export type SymbolProbe = (root: string, name: string) => boolean | undefined
 
 /**
