@@ -23,7 +23,7 @@ import { verify } from './verify.js'
 import { why } from './why.js'
 import { ctx } from './ctx.js'
 import { done, unclaimedWork } from './done.js'
-import { COLOUR, PLAIN, USAGE, renderAsk, renderCtx, renderDone, renderNoProgress, renderUnclaimed, renderWhy } from './render.js'
+import { USAGE, choosePalette, renderAsk, renderCtx, renderDone, renderNoProgress, renderUnclaimed, renderWhy, type ColourEnv } from './render.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
 import { briefCommand } from './cli-brief.js'
@@ -60,6 +60,22 @@ export function isDirectlyInvoked(
   return invoked === moduleFile || realpath(invoked) === realpath(moduleFile)
 }
 
+/**
+ * The only place `process` is consulted for rendering.
+ *
+ * `--no-colour` is kept alongside `--no-color` because it already shipped; dropping a flag
+ * that works is a breaking change nobody asked for.
+ */
+function colourEnv(rest: readonly string[]): ColourEnv {
+  return {
+    isTTY: Boolean(process.stdout.isTTY),
+    // Present at *any* value, per the NO_COLOR convention — never tested for truthiness.
+    noColorEnv: process.env['NO_COLOR'] !== undefined,
+    noColorFlag: rest.includes('--no-color') || rest.includes('--no-colour'),
+    colorFlag: rest.includes('--color') || rest.includes('--colour'),
+  }
+}
+
 export function run(
   argv: readonly string[],
   out: (text: string) => void,
@@ -68,7 +84,7 @@ export function run(
   changedFiles: ChangedFiles = gitChangedFiles,
 ): number {
   const [command, ...rest] = argv
-  const palette = rest.includes('--no-colour') ? PLAIN : COLOUR
+  const palette = choosePalette(colourEnv(rest))
   const positional = rest.find((a) => !a.startsWith('-'))
 
   if (command === 'pack') {

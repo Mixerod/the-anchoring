@@ -35,6 +35,45 @@ export const COLOUR: Palette = {
 
 export const PLAIN: Palette = { dim: '', red: '', yellow: '', green: '', bold: '', off: '' }
 
+/**
+ * What the CLI boundary observed. A plain record, so the decision below stays pure and
+ * `render.ts` learns nothing about `process`.
+ */
+export interface ColourEnv {
+  /** `process.stdout.isTTY`. Falsy for a pipe, a file, or a captured subprocess. */
+  readonly isTTY: boolean
+  /** Whether `NO_COLOR` is *present*, at any value. Not whether it is truthy. */
+  readonly noColorEnv: boolean
+  readonly noColorFlag: boolean
+  readonly colorFlag: boolean
+}
+
+/**
+ * Which palette to render with.
+ *
+ * Until Layer 5 this tool emitted ANSI unconditionally, including into a pipe:
+ *
+ *     $ kb verify --strict | tail -2
+ *     \x1b[32mkb verify: clean\x1b[0m \x1b[2m(35 entities, 285 anchors)\x1b[0m
+ *
+ * Invisible to a human and pure waste to an agent capturing the output — tokens paid for
+ * escape sequences, plus parsing noise, on every call, forever.
+ *
+ * `NO_COLOR` follows the published convention: **set to any value, including empty**. It is
+ * deliberately not tested for truthiness, because `NO_COLOR=` and `NO_COLOR=0` both mean no
+ * colour, and reading them as "yes colour" is the kind of near-miss that looks correct in
+ * every manual test.
+ *
+ * `--no-color` beats `--color`: an explicit refusal outranks an explicit request, so a
+ * script that hardcodes one can still be overridden by the person running it.
+ */
+export function choosePalette(env: ColourEnv): Palette {
+  if (env.noColorFlag) return PLAIN
+  if (env.colorFlag) return COLOUR
+  if (env.noColorEnv) return PLAIN
+  return env.isTTY ? COLOUR : PLAIN
+}
+
 function renderFinding(f: Finding, c: Palette): string {
   const tag = f.severity === 'error' ? `${c.red}error${c.off}` : `${c.yellow}warn ${c.off}`
   const hint = f.hint ? `\n         ${c.dim}-> ${f.hint}${c.off}` : ''

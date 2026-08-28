@@ -12,18 +12,16 @@
 import { planBrief } from './brief.js'
 import { readBriefInput } from './brief-source.js'
 import { renderBrief, renderBriefJson, compareRenders } from './render-brief.js'
+import { corpusStats, renderStats } from './render-stats.js'
 import { recallWork } from './session.js'
 import type { AnchoringConfig } from './config.js'
 
-export const BRIEF_USAGE = 'usage: kb brief [--json] [--check]'
+export const BRIEF_USAGE = 'usage: kb brief [--json] [--check] [--stats]'
 
-const KNOWN_FLAGS = ['--json', '--check']
+const KNOWN_FLAGS = ['--json', '--check', '--stats']
 
-/**
- * Flags `run` consumes before dispatch, which every subcommand must therefore tolerate.
- * Layer 5 Part B extends this set (`--color`, `--no-color`); keep the two in step.
- */
-const GLOBAL_FLAGS = ['--no-colour']
+/** Flags `run` consumes before dispatch, which every subcommand must therefore tolerate. */
+const GLOBAL_FLAGS = ['--no-colour', '--no-color', '--colour', '--color']
 
 /**
  * `--check` renders twice from two *independent* loads of the corpus.
@@ -70,7 +68,14 @@ export function briefCommand(
 
   if (rest.includes('--check')) return checkStability(config, out)
 
-  const brief = planBrief(readBriefInput(config, recallWork(config)))
+  const input = readBriefInput(config, recallWork(config))
+  const brief = planBrief(input)
+
+  if (rest.includes('--stats')) {
+    out(renderStats(corpusStats(brief, input)))
+    return 0
+  }
+
   out(rest.includes('--json') ? renderBriefJson(brief) : renderBrief(brief))
   return 0
 }
