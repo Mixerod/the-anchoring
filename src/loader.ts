@@ -20,6 +20,21 @@ export function readFrontmatter(path: string): ParseResult {
   }
 }
 
+/**
+ * One file's text, or `undefined` when it cannot be read.
+ *
+ * Exported so composing readers — `brief-source.ts` — need no `node:fs` import of their own.
+ * Every added `readFileSync` is another place the pure/infra boundary has to be re-argued,
+ * and the boundary is the redaction guarantee, not a filing convention.
+ */
+export function readText(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    return undefined
+  }
+}
+
 export function listMarkdown(dir: string): readonly string[] {
   let names: readonly string[]
   try {
