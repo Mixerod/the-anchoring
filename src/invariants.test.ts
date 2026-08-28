@@ -93,7 +93,7 @@ describe('invariants enforcement (eslint)', { timeout: 20_000 }, () => {
         })
         .join('\n')
 
-    for (const file of ['src/upstream.ts', 'src/guards.ts', 'src/pack.ts', 'src/ask.ts']) {
+    for (const file of ['src/upstream.ts', 'src/guards.ts', 'src/pack.ts', 'src/ask.ts', 'src/promote.ts']) {
       it(`${file} performs no I/O and reads no clock`, async () => {
         const { readFileSync } = await import('node:fs')
         const source = readFileSync(file, 'utf8')
@@ -121,6 +121,7 @@ describe('invariants enforcement (eslint)', { timeout: 20_000 }, () => {
       expect(index.findRepoRoot).toBeTypeOf('function')
       expect(index.planInit).toBeTypeOf('function')
       expect(index.applyInit).toBeTypeOf('function')
+      expect(index.planPromote).toBeTypeOf('function')
     })
   })
 })

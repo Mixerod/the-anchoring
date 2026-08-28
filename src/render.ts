@@ -116,6 +116,7 @@ export const USAGE =
   '  kb guards [--check]    generate checkers from the architecture matrix\n' +
   '  kb owners [--check]    project ownership into CODEOWNERS\n' +
   '  kb pack <subcommand>   portable engineering knowledge packs (list, add, check)\n' +
+  '  kb promote <INC-id>    promote a local incident to a pack hazard\n' +
   '  kb upstream [--check]  project attributable incidents into reviewable reports\n' +
   '                         --list, --dry-run, --open-work <path-to-upstream-repo>\n'
 

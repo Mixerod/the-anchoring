@@ -224,7 +224,9 @@ export function planPack(
     notes.push(`skipped ${skipped.length} hand-edited file(s); use --force to overwrite`)
   }
   if (hazardCount > 0) {
-    notes.push(`${hazardCount} hazards seeded; these arrive untriaged and each must be moved to open, guarded or accepted deliberately.`)
+    notes.push(
+      `${hazardCount} hazard${hazardCount === 1 ? '' : 's'} seeded; these arrive untriaged and each must be moved to open, guarded or accepted deliberately.`,
+    )
   }
 
   return {

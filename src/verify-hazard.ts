@@ -107,7 +107,7 @@ export function checkHazard(
   }
 
   const anchors = entity.links['holds_for'] ?? []
-  if (anchors.length === 0) {
+  if (resolution !== 'not-applicable' && anchors.length === 0) {
     findings.push({
       severity: 'error',
       where: at('holds_for'),

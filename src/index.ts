@@ -234,5 +234,17 @@ export {
 } from './upstream.js'
 export { runUpstream, readPackageFacts, readExistingReports } from './cli-upstream.js'
 
+// Promote (Layer 4 Part C)
+export {
+  planPromote,
+  extractExistingHazards,
+  nextHazardId,
+  type ExistingHazard,
+  type PromoteOptions,
+  type PromotedHazard,
+  type PromotePlan,
+} from './promote.js'
+export { promoteCommand } from './cli-promote.js'
+
 // CLI runner
 export { run, isDirectlyInvoked } from './cli.js'

@@ -313,7 +313,7 @@ describe('CLI kb pack commands and init --pack integration', () => {
     const code = run(['pack', 'list', '--no-colour'], (t) => out.push(t), (t) => err.push(t))
     expect(code).toBe(0)
     expect(out.join('\n')).toContain('discipline (1.0.0)')
-    expect(out.join('\n')).toContain('1 invariant, 5 doctrines, 0 hazards')
+    expect(out.join('\n')).toContain('1 invariant, 5 doctrines, 2 hazards')
   })
 
   test('kb pack add discipline --dry-run prints would write and does not write', () => {

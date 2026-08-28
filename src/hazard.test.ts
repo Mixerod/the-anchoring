@@ -82,6 +82,20 @@ describe('hazard schema', () => {
 
     expect(findings(root)).toEqual([])
   })
+
+  test('accepts a not-applicable hazard with empty holds_for (e.g. untriaged pack seed)', () => {
+    const root = fixture(
+      code,
+      haz(
+        'HAZ-0001',
+        '---\nid: HAZ-0001\ntitle: Untriaged\nstatus: active\nsource: https://example.org/report\n' +
+          'observed: 2026-01-01\nrecorded: 2026-08-23\nresolution: not-applicable\n' +
+          'reason: not yet triaged in this repository\nholds_for: []\n---\n',
+      ),
+    )
+
+    expect(findings(root)).toEqual([])
+  })
 })
 
 describe('source is mandatory', () => {

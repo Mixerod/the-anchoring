@@ -39,6 +39,7 @@ export default tseslint.config(
       'src/cli-upstream.ts',
       'src/pack-source.ts',
       'src/cli-pack.ts',
+      'src/cli-promote.ts',
     ],
     rules: {
       'no-restricted-imports': [

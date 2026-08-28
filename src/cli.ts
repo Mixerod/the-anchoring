@@ -28,6 +28,7 @@ import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
 import { runUpstream } from './cli-upstream.js'
 import { packCommand } from './cli-pack.js'
+import { promoteCommand } from './cli-promote.js'
 
 /**
  * Whether this module is the program being run, rather than a module being imported.
@@ -71,6 +72,11 @@ export function run(
   if (command === 'pack') {
     const packRoot = root ?? findRepoRoot(process.cwd()) ?? process.cwd()
     return packCommand(rest, packRoot, out, err)
+  }
+
+  if (command === 'promote') {
+    const promoteRoot = root ?? findRepoRoot(process.cwd()) ?? process.cwd()
+    return promoteCommand(rest, promoteRoot, out, err)
   }
 
   if (command === 'init') {

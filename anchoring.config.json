@@ -35,7 +35,8 @@
         "paths": [
           "src/cli.ts",
           "src/cli-upstream.ts",
-          "src/cli-pack.ts"
+          "src/cli-pack.ts",
+          "src/cli-promote.ts"
         ]
       },
       {
@@ -66,7 +67,8 @@
           "src/anchors.ts",
           "src/upstream.ts",
           "src/ask.ts",
-          "src/pack.ts"
+          "src/pack.ts",
+          "src/promote.ts"
         ],
         "pure": true
       },
