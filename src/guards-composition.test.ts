@@ -28,6 +28,10 @@ const SAMPLE_ARCH: Architecture = {
   entryPoints: ['index.ts', 'index.tsx', 'index.js'],
   maxFileLines: 400,
   maxFunctionLines: 50,
+  maxFunctionLinesBaseline: {},
+  ioExemptions: [],
+  restrictedSyntax: [],
+  ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
   impureImports: ['node:fs', 'node:child_process', 'node:http', 'node:https', 'node:crypto'],
 }
 
@@ -50,6 +54,10 @@ describe('one violation, one error (T13b)', () => {
       entryPoints: ['index.ts'],
       maxFileLines: 400,
       maxFunctionLines: 50,
+      maxFunctionLinesBaseline: {},
+      ioExemptions: [],
+      restrictedSyntax: [],
+      ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
       impureImports: ['node:fs'],
     }
     const config = { ...defaultConfig(root), architecture: arch }

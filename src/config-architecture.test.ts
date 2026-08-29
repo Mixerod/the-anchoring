@@ -9,6 +9,7 @@ import {
   parseConfig,
   DEFAULT_ENTRY_POINTS,
   DEFAULT_IMPURE_IMPORTS,
+  DEFAULT_IO_MESSAGE,
   DEFAULT_MAX_FILE_LINES,
   DEFAULT_MAX_FUNCTION_LINES,
 } from './config.js'
@@ -34,7 +35,11 @@ describe('architecture block validation and defaults', () => {
         entryPoints: DEFAULT_ENTRY_POINTS,
         maxFileLines: DEFAULT_MAX_FILE_LINES,
         maxFunctionLines: DEFAULT_MAX_FUNCTION_LINES,
+        maxFunctionLinesBaseline: {},
         impureImports: DEFAULT_IMPURE_IMPORTS,
+        ioExemptions: [],
+        restrictedSyntax: [],
+        ioMessage: DEFAULT_IO_MESSAGE,
       })
     }
   })

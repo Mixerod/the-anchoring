@@ -28,6 +28,10 @@ const SAMPLE_ARCH: Architecture = {
   entryPoints: ['index.ts'],
   maxFileLines: 400,
   maxFunctionLines: 50,
+  maxFunctionLinesBaseline: {},
+  ioExemptions: [],
+  restrictedSyntax: [],
+  ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
   impureImports: ['node:fs'],
 }
 
@@ -49,6 +53,10 @@ describe('agents architecture section generation', () => {
       entryPoints: ['index.ts'],
       maxFileLines: 400,
       maxFunctionLines: 50,
+      maxFunctionLinesBaseline: {},
+      ioExemptions: [],
+      restrictedSyntax: [],
+      ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
       impureImports: [],
     })
 

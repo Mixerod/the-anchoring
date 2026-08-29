@@ -23,9 +23,9 @@ cli
   ↓
 app
   ↓
-domain (pure)
-  ↓
 infra
+  ↓
+domain (pure)
 ```
 
 - Dependencies point one way, down the layer order. Importing upward is forbidden (`INV-DEP-DIRECTION`).

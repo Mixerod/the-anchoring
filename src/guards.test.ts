@@ -22,6 +22,10 @@ const SAMPLE_ARCH: Architecture = {
   entryPoints: ['index.ts', 'index.tsx', 'index.js'],
   maxFileLines: 400,
   maxFunctionLines: 50,
+  maxFunctionLinesBaseline: {},
+  ioExemptions: [],
+  restrictedSyntax: [],
+  ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
   impureImports: ['node:fs', 'node:child_process', 'node:http', 'node:https', 'node:crypto'],
 }
 
@@ -50,11 +54,19 @@ describe('guardsHash', () => {
       entryPoints: ['index.ts'],
       maxFileLines: 300,
       maxFunctionLines: 40,
+      maxFunctionLinesBaseline: {},
+      ioExemptions: [],
+      restrictedSyntax: [],
+      ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
       impureImports: ['node:fs'],
     }
 
     const archB: Architecture = {
       maxFunctionLines: 40,
+      maxFunctionLinesBaseline: {},
+      ioExemptions: [],
+      restrictedSyntax: [],
+      ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
       entryPoints: ['index.ts'],
       layers: [{ pure: false, paths: ['src/a/'], name: 'a' }],
       impureImports: ['node:fs'],
@@ -99,6 +111,10 @@ describe('planGuards generation rules', () => {
         entryPoints: ['index.ts'],
         maxFileLines: 400,
         maxFunctionLines: 50,
+        maxFunctionLinesBaseline: {},
+        ioExemptions: [],
+        restrictedSyntax: [],
+        ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
         impureImports: [],
       },
     }
@@ -144,6 +160,10 @@ describe('planGuards generation rules', () => {
         entryPoints: ['index.ts'],
         maxFileLines: 400,
         maxFunctionLines: 50,
+        maxFunctionLinesBaseline: {},
+        ioExemptions: [],
+        restrictedSyntax: [],
+        ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
         impureImports: [],
       },
     }
@@ -160,10 +180,13 @@ describe('planGuards generation rules', () => {
       architecture: SAMPLE_ARCH,
     })
     const mjsWithPure = withPure.files.find((f) => f.path === 'anchoring.guards.mjs')?.body ?? ''
-    expect(mjsWithPure).toContain('no-restricted-imports')
     expect(mjsWithPure).toContain('no-restricted-globals')
     expect(mjsWithPure).toContain('no-restricted-properties')
-    expect(mjsWithPure).toContain('domain is the pure layer: pass the value in as an argument instead of importing node:fs.')
+    expect(mjsWithPure).toContain('no-restricted-syntax')
+    // `new Date()` is banned in the pure layer only; the import ban is wider than the pure
+    // layer now and is asserted separately below.
+    expect(mjsWithPure).toContain('NewExpression[callee.name="Date"]')
+    expect(mjsWithPure).toContain('domain is the pure layer')
 
     const withoutPure = planGuards({
       ...defaultConfig('/root'),
@@ -173,9 +196,14 @@ describe('planGuards generation rules', () => {
       },
     })
     const mjsWithoutPure = withoutPure.files.find((f) => f.path === 'anchoring.guards.mjs')?.body ?? ''
-    expect(mjsWithoutPure).not.toContain('no-restricted-imports')
     expect(mjsWithoutPure).not.toContain('no-restricted-globals')
     expect(mjsWithoutPure).not.toContain('no-restricted-properties')
+    expect(mjsWithoutPure).not.toContain('NewExpression[callee.name="Date"]')
+
+    // The impure-import ban survives with no pure layer: it covers every governed file,
+    // minus the declared adapters. Purity narrows *which* extra rules apply, not whether
+    // the codebase is allowed to reach for node:fs at random.
+    expect(mjsWithoutPure).toContain('no-restricted-imports')
   })
 
   test('moduleRoots produce one entry-only rule each and entryPoints appear in pattern', () => {
@@ -198,6 +226,10 @@ describe('planGuards generation rules', () => {
         ...SAMPLE_ARCH,
         maxFileLines: 250,
         maxFunctionLines: 35,
+        maxFunctionLinesBaseline: {},
+        ioExemptions: [],
+        restrictedSyntax: [],
+        ioMessage: 'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.',
       },
     }
     const plan = planGuards(config)
