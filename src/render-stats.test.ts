@@ -64,6 +64,29 @@ describe('corpusStats', () => {
   test('reports bytes per tier', () => {
     expect(stats().tiers.map((t) => t.level)).toEqual([1, 2, 3, 4])
   })
+
+  test('corpus equals brief plus what the brief leaves out', () => {
+    // The arithmetic a reader will do in their head, so it has to hold. Counting the brief's
+    // own markers as brief content broke it: on a small corpus the brief came out *larger*
+    // than everything while reporting nothing excluded - correct arithmetic that reads as
+    // nonsense, which is worse than a wrong number because it looks like a lie.
+    const s = stats()
+
+    expect(s.briefBytes + s.excludedBytes).toBe(s.totalBytes)
+  })
+
+  test('markers are counted apart from document content', () => {
+    const s = stats()
+
+    expect(s.frameBytes).toBeGreaterThan(0)
+    expect(s.briefBytes).not.toBe(0)
+  })
+
+  test('doctrine and AGENTS.md count as bundled, because tier 1 carries them', () => {
+    const s = stats()
+
+    expect(s.briefBytes).toBeGreaterThanOrEqual(s.fileBytes)
+  })
 })
 
 describe('renderStats — the honesty requirement', () => {

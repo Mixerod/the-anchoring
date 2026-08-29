@@ -38,8 +38,10 @@ export interface KindBytes {
 export interface CorpusStats {
   /** Every entity and doctrine file, whether the brief carries it or not. */
   readonly totalBytes: number
-  /** What `kb brief` actually emits. */
+  /** Document content the brief carries, excluding its own framing. */
   readonly briefBytes: number
+  /** The tier and document markers the renderer adds. Not corpus content. */
+  readonly frameBytes: number
   readonly tiers: readonly { readonly level: TierLevel; readonly bytes: number }[]
   readonly kinds: readonly KindBytes[]
   /** AGENTS.md and doctrine: tier-1 files that are not entities. */
@@ -52,6 +54,7 @@ export interface CorpusStats {
 
 export function corpusStats(brief: Brief, input: BriefInput): CorpusStats {
   const bundled = new Set(brief.tiers.flatMap((t) => t.documents.map((d) => d.id)))
+  const renderedBytes = brief.tiers.reduce((n, t) => n + byteLength(renderTierBody(t, brief)), 0)
 
   const fileBytes =
     (input.agents ? byteLength(input.agents.body) : 0) +
@@ -59,9 +62,21 @@ export function corpusStats(brief: Brief, input: BriefInput): CorpusStats {
   const entityBytes = input.entities.reduce((n, e) => n + byteLength(e.body), 0)
   const excluded = input.entities.filter((e) => !bundled.has(e.entity.id))
 
+  // AGENTS.md and doctrine are tier 1, so they count as bundled. Leaving them out made
+  // `brief + not-in-the-brief` fall short of `corpus` by exactly their size.
+  const bundledBytes =
+    fileBytes +
+    input.entities
+      .filter((e) => bundled.has(e.entity.id))
+      .reduce((n, e) => n + byteLength(e.body), 0)
+
   return {
     totalBytes: fileBytes + entityBytes,
-    briefBytes: brief.tiers.reduce((n, t) => n + byteLength(renderTierBody(t, brief)), 0),
+    briefBytes: bundledBytes,
+    // Kept apart so `corpus = brief + not-in-the-brief` adds up. Folding the markers into
+    // the brief figure made it exceed the corpus on a small repository while reporting
+    // nothing excluded - arithmetic that is correct and reads as nonsense.
+    frameBytes: renderedBytes - bundledBytes,
     tiers: brief.tiers.map((tier) => ({
       level: tier.level,
       bytes: byteLength(renderTierBody(tier, brief)),
@@ -99,7 +114,8 @@ export function renderStats(stats: CorpusStats): string {
     `corpus: ${thousands(stats.totalBytes)} bytes  ` +
       `(${thousands(stats.fileBytes)} in ${stats.fileCount} doctrine/agent file(s), rest entities)`,
     `        by kind: ${perKind}`,
-    `        brief:   ${thousands(stats.briefBytes)} bytes  (${perTier})`,
+    `        brief:   ${thousands(stats.briefBytes)} bytes of documents` +
+      ` + ${thousands(stats.frameBytes)} of markers  (${perTier})`,
     `        not in the brief: ${thousands(stats.excludedBytes)} bytes in ` +
       `${stats.excludedCount} document(s) — incidents, retired, superseded, closed work`,
     `        ~ ${thousands(tokens)} tokens (estimate, bytes/${BYTES_PER_TOKEN_ESTIMATE};` +
