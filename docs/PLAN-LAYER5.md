@@ -96,7 +96,11 @@ Restated because these are the ones that get broken.
 
 ```
 npm install && npm run verify
-npm run kb -- verify --strict          # expect: kb verify: clean (31 entities, 264 anchors)
+npm run kb -- verify --strict          # expect: kb verify: clean
+#
+# The count in this line was 31/264 when the plan was written and has moved since with
+# ordinary commits. Check that it is *clean*, and investigate a change in the numbers
+# rather than treating either the old or the new figure as the criterion.
 ```
 
 If either differs, stop and report. Do not start fixing.
@@ -129,7 +133,7 @@ then by id ascending, using a plain codepoint comparison. **Never** filesystem o
 `readdir` result is not a guaranteed order, and on a different machine it will differ, which
 means a silent cache miss on every call.
 
-**The trap that will catch you.** Any summary that moves — `(31 entities, 264 anchors)`, a
+**The trap that will catch you.** Any summary that moves — an entity or anchor count, a
 timestamp, a git SHA, a duration — placed anywhere in tiers 1–3 invalidates every tier after
 it on the next commit. All of it belongs in tier 4. Write the test that asserts tiers 1–3
 contain no digit sequence derived from a count.
@@ -299,7 +303,9 @@ Add a closing section naming, in one line each:
 
 - how many entities were searched, and how many scored zero;
 - hazards **not** shown and why (`resolution: guarded` — already handled);
-- retired invariants and superseded ADRs excluded, with counts;
+- retired invariants and superseded ADRs excluded, with counts. Note that superseded ADRs
+  were *not* excluded from ranking before this layer, so excluding them is a change to what
+  `kb ask` returns, not merely a count of something already happening;
 - for a query matching nothing, the existing negative report stays, plus these counts.
 
 Keep it to counts and reasons. Do not list the excluded entities — that would reintroduce the
@@ -361,3 +367,43 @@ Each part ends with a written report containing:
 3. Every acceptance item, marked with what it actually printed.
 4. Every defect found in this plan. It was written without executing it; each previous plan
    in this repository contained three to five. A correction is a contribution.
+
+---
+
+## Addendum — defects found while executing this plan
+
+This plan was written without running it. The following were found during implementation and
+are recorded here so the next reader is not misled by the text above.
+
+1. **The baseline count is stale.** §2 and §3 quote `31 entities, 264 anchors`. Three
+   entities were committed after the plan was written, so a correct run reports more. The
+   criterion is `clean`; a changed count is something to explain, not to fail on.
+
+2. **§A.1's tier test cannot be written as specified.** "Tiers 1–3 contain no digit sequence
+   derived from a count" is unsatisfiable against real bodies — doctrine prose legitimately
+   contains sentences like "48 packages, 30 enforced boundaries". The property that is both
+   checkable and meaningful is that tiers 1–3 are byte-identical when the volatile facts
+   change, plus that the renderer injects nothing into a stable tier but markers naming a
+   path. Both are implemented.
+
+3. **§B.1 overstates the colour defect.** `PLAIN` was not "referenced only from tests":
+   `cli.ts` selected it for `--no-colour`. The real defect was narrower and worse — nothing
+   consulted `isTTY` or `NO_COLOR`, so every piped run carried escapes.
+
+4. **§B.3 does not say what a clean run should do.** Left unstated, three consecutive
+   finding-free runs would have warned "no progress; the same 0 findings persist". A green
+   repository is not a stuck loop, and the implementation never warns on an empty finding
+   set.
+
+5. **§B.2's "corpus" is ambiguous and, read narrowly, dishonest.** The brief excludes
+   incidents, retired documents and closed work. Reporting only the bundled part under the
+   word "corpus" understated this repository by more than 20,000 bytes. Both figures are now
+   reported, with the excluded documents counted and named.
+
+6. **§C.1 assumes superseded ADRs were already excluded from `kb ask`.** They were not, so a
+   count of "superseded decisions excluded" would have described something that never
+   happened. They are excluded now — a deliberate behaviour change, noted above.
+
+7. **The whole plan assumed the architecture guards worked.** They did not: every generated
+   pattern matched nothing, so "obeys the layer matrix" was a vacuous acceptance item in all
+   three parts. See `.anchor/incident/INC-0004.md`.
