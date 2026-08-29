@@ -1,0 +1,6 @@
+# Generated guards are compared against generator output, and the generator writes LF.
+# Without this, a Windows checkout with core.autocrlf=true rewrites them to CRLF and
+# `kb guards --check` reports `hand-edited` on a file nobody touched. See INC-0004.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

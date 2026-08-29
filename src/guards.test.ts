@@ -397,4 +397,19 @@ describe('CLI kb guards', () => {
     const code = run(['guards', '--check'], (t) => out.push(t), () => {}, root)
     expect(code).toBe(1)
   })
+
+  test('a CRLF checkout is not mistaken for a hand edit', () => {
+    // On Windows with core.autocrlf=true a fresh clone rewrites these files to CRLF while
+    // the generator writes LF. Comparing bytes reported `hand-edited` on a file nobody had
+    // touched - a drift detector crying wolf on the very first checkout is one people learn
+    // to ignore, which costs more than the detector was worth.
+    const plan = planGuards({ ...defaultConfig('/root'), architecture: SAMPLE_ARCH })
+    const asCheckedOut = new Map(
+      plan.files.map((f) => [f.path, f.body.replace(/\n/g, '\r\n')]),
+    )
+
+    const states = checkGuards(plan, (path) => asCheckedOut.get(path))
+
+    expect(states.every((r) => r.state === 'ok')).toBe(true)
+  })
 })

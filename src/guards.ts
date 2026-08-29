@@ -423,6 +423,20 @@ export function planGuards(config: AnchoringConfig): GuardsPlan {
   }
 }
 
+/**
+ * Content equality that ignores the line ending, because git decides that, not the author.
+ *
+ * On Windows with `core.autocrlf=true` a fresh clone writes CRLF while this generator writes
+ * LF, so a byte comparison reported `hand-edited` on a file nobody had touched - a drift
+ * detector raising a false alarm on the very first checkout, which is a detector people
+ * learn to ignore. `.gitattributes` pins the checked-out form; this makes the check correct
+ * even where it is not.
+ */
+function sameContent(a: string, b: string): boolean {
+  const lf = (text: string): string => text.replace(/\r\n?/g, '\n')
+  return lf(a) === lf(b)
+}
+
 export function checkGuards(
   plan: GuardsPlan,
   read: (path: string) => string | undefined,
@@ -436,7 +450,7 @@ export function checkGuards(
       continue
     }
 
-    if (actual === file.body) {
+    if (sameContent(actual, file.body)) {
       results.push({ path: file.path, state: 'ok' })
       continue
     }
