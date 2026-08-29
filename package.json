@@ -1,6 +1,6 @@
 {
   "name": "the-anchoring",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "An intent graph in git, anchored to code, machine-checked. Makes a repository legible to agents.",
   "license": "MIT",
   "type": "module",
@@ -43,5 +43,29 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.20.0",
     "vitest": "^3.0.0"
+  },
+  "author": "Mixerod",
+  "keywords": [
+    "agents",
+    "ai-agents",
+    "llm",
+    "context",
+    "prompt-caching",
+    "architecture",
+    "adr",
+    "invariants",
+    "dependency-cruiser",
+    "eslint",
+    "documentation",
+    "knowledge-base",
+    "codegraph"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mixerod/the-anchoring.git"
+  },
+  "homepage": "https://github.com/Mixerod/the-anchoring#readme",
+  "bugs": {
+    "url": "https://github.com/Mixerod/the-anchoring/issues"
   }
 }
