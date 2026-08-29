@@ -51,9 +51,19 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/**
+ * A directory constrains a prefix; a file must match exactly.
+ *
+ * Without the `$`, the layer path `src/verify.ts` would also claim `src/verify.ts.bak` and
+ * any future `src/verify.tsx` - a checker quietly governing files nobody assigned to it.
+ */
+function pathToPattern(p: string): string {
+  return p.endsWith('/') ? escapeRegex(p) : `${escapeRegex(p)}$`
+}
+
 function pathsToPattern(paths: readonly string[]): string {
   if (paths.length === 0) return ''
-  const escaped = paths.map(escapeRegex)
+  const escaped = paths.map(pathToPattern)
   return escaped.length === 1 ? `^${escaped[0]}` : `^(${escaped.join('|')})`
 }
 
@@ -146,28 +156,28 @@ function globForPath(p: string): string {
   return p.endsWith('/') ? `${p}**/*` : p
 }
 
-function generateGuardsMjs(arch: Architecture, hash: string): string {
-  const header = generateHeader(hash)
-  const allTargetPaths: string[] = []
-
-  for (const layer of arch.layers) {
-    for (const p of layer.paths) {
-      allTargetPaths.push(globForPath(p))
-    }
-  }
-  for (const root of arch.moduleRoots) {
-    allTargetPaths.push(globForPath(root))
-  }
-
-  const targetFiles =
-    allTargetPaths.length > 0
-      ? allTargetPaths.map((p) => `      '${p}',`).join('\n')
-      : "      '**/*',"
-
-  const blocks: string[] = []
-
-  // Block 1: size ceilings
-  blocks.push(`  {
+/**
+ * One `max-lines-per-function` override per file that is over the limit today, set to that
+ * file's longest function *now* - the ratchet.
+ *
+ * A new file meets `maxFunctionLines` immediately; an exempt file can never get worse; and
+ * the debt is a list somebody can watch shrink. Sorted by path so the emitted file stays
+ * byte-stable.
+ *
+ * What stops this becoming a permanent amnesty is a test, not this comment: every entry is
+ * pinned to the exact current worst, so it cannot be raised to wave a regression through,
+ * and it cannot be left behind once the function is finally split.
+ */
+/**
+ * The two size ceilings: source files, then test files.
+ *
+ * Test files need their own block because `layers[].paths` name source files, so without it
+ * `max-lines` never sees a test at all. The two ceilings differ on purpose: a 900-line test
+ * file is a real problem and keeps the file limit, while a 200-line `describe` body is not,
+ * so the per-function limit stays off there.
+ */
+function generateSizeBlocks(arch: Architecture, targetFiles: string): readonly string[] {
+  const ceilings = (functionRule: string): string => `  {
     files: [
 ${targetFiles}
     ],
@@ -180,56 +190,71 @@ ${targetFiles}
           skipComments: true,
         },
       ],
-      'max-lines-per-function': [
+      ${functionRule},
+    },
+  }`
+
+  return [
+    ceilings(`'max-lines-per-function': [
         'error',
         {
           max: ${arch.maxFunctionLines},
           skipBlankLines: true,
           skipComments: true,
         },
-      ],
-    },
-  }`)
+      ]`),
+    ceilings("'max-lines-per-function': 'off'").replace(
+      `files: [
+${targetFiles}
+    ]`,
+      "files: ['**/*.test.*', '**/*.spec.*']",
+    ),
+  ]
+}
 
-  // Block 2: test files.
-  //
-  // `layers[].paths` name source files, so without this block `max-lines` never sees a
-  // test file at all. The two ceilings are treated differently on purpose: a 900-line
-  // test file is a real problem and keeps the file limit, while a 200-line `describe`
-  // body is not, so the function limit stays off.
-  blocks.push(`  {
-    files: ['**/*.test.*', '**/*.spec.*'],
+function generateBaselineBlocks(arch: Architecture): readonly string[] {
+  return Object.entries(arch.maxFunctionLinesBaseline)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(
+      ([file, max]) => `  {
+    files: ['${file}'],
     rules: {
-      'max-lines': [
+      'max-lines-per-function': [
         'error',
         {
-          max: ${arch.maxFileLines},
+          max: ${max},
           skipBlankLines: true,
           skipComments: true,
         },
       ],
-      'max-lines-per-function': 'off',
     },
-  }`)
+  }`,
+    )
+}
 
-  // Block 3: pure layer
-  const pureLayer = arch.layers.find((l) => l.pure)
-  if (pureLayer) {
-    const purePaths = pureLayer.paths.map((p) => `      '${globForPath(p)}',`).join('\n')
-    // `patterns` only, never `paths`. The group ['node:fs', 'node:fs/*'] already matches
-    // the bare specifier, so emitting both made a single violation report twice:
-    //   'node:fs' import is restricted from being used.
-    //   'node:fs' import is restricted from being used by a pattern.
-    const importPatterns = arch.impureImports
-      .map(
-        (mod) =>
-          `          {\n            group: ['${mod}', '${mod}/*'],\n            message: '${pureLayer.name} is the pure layer: pass the value in as an argument instead of importing ${mod}.',\n          },`,
-      )
-      .join('\n')
+/** The impure-import ban, over every governed file except the declared I/O adapters. */
+function generateImportBlock(arch: Architecture, targetFiles: string): readonly string[] {
+  // Wider than the pure layer on purpose. `node:fs` in an app-layer module is just as much
+  // a boundary violation as in the domain, and the exemption list names the adapters that
+  // exist to do exactly that.
+  const exemptions = [...arch.ioExemptions, '**/*.test.*', '**/*.spec.*']
+  const importPatterns = arch.impureImports
+    .map(
+      (mod) =>
+        `          {
+            group: ['${mod}', '${mod}/*'],
+            message: '${arch.ioMessage.replace(/{module}/g, mod).replace(/'/g, "\\'")}',
+          },`,
+    )
+    .join('\n')
 
-    blocks.push(`  {
+  return [
+    `  {
     files: [
-${purePaths}
+${targetFiles}
+    ],
+    ignores: [
+${exemptions.map((e) => `      '${e}',`).join('\n')}
     ],
     rules: {
       'no-restricted-imports': [
@@ -240,12 +265,68 @@ ${importPatterns}
           ],
         },
       ],
+    },
+  }`,
+  ]
+}
+
+/**
+ * Project-declared syntax bans, then the pure layer's.
+ *
+ * The pure block repeats the project selectors. It has to: two config objects declaring one
+ * rule do not merge - the later replaces the earlier - and this block is later. Omitting
+ * them would silently switch them off for exactly the layer that needs them most, which is
+ * the defect this file was rewritten to fix. See .anchor/incident/INC-0004.md.
+ */
+function generateSyntaxBlocks(arch: Architecture, targetFiles: string): readonly string[] {
+  const quote = (text: string): string => text.replace(/'/g, "\\'")
+  const projectSyntax = arch.restrictedSyntax.map(
+    (r) =>
+      `        {
+          selector: '${quote(r.selector)}',
+          message: '${quote(r.message)}',
+        },`,
+  )
+
+  const out: string[] = []
+  if (projectSyntax.length > 0) {
+    out.push(`  {
+    files: [
+${targetFiles}
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+${projectSyntax.join('\n')}
+      ],
+    },
+  }`)
+  }
+
+  const pureLayer = arch.layers.find((l) => l.pure)
+  if (!pureLayer) return out
+
+  const purePaths = pureLayer.paths.map((p) => `      '${globForPath(p)}',`).join('\n')
+  const pureSyntax = [
+    ...projectSyntax,
+    `        {
+          selector: 'NewExpression[callee.name="Date"]',
+          message: '${pureLayer.name} is the pure layer: pass the value in as an argument instead of constructing a Date.',
+        },`,
+  ]
+
+  out.push(`  {
+    files: [
+${purePaths}
+    ],
+    ignores: ['**/*.test.*', '**/*.spec.*'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+${pureSyntax.join('\n')}
+      ],
       'no-restricted-globals': [
         'error',
-        {
-          name: 'Date',
-          message: '${pureLayer.name} is the pure layer: pass the value in as an argument instead of using global Date.',
-        },
         {
           name: 'fetch',
           message: '${pureLayer.name} is the pure layer: pass the value in as an argument instead of using global fetch.',
@@ -270,7 +351,42 @@ ${importPatterns}
       ],
     },
   }`)
-  }
+
+  return out
+}
+
+/**
+ * Which files the project-wide rules cover.
+ *
+ * `governedPaths` first, as a directory glob, with the enumerated layer paths only as a
+ * fallback. Enumerating files alone leaves a hole exactly where it hurts: a module somebody
+ * adds before registering it in the matrix would match no block at all, so it would carry
+ * no size ceiling and no import ban - unguarded precisely while it is newest and least
+ * reviewed. A directory glob has no such gap.
+ */
+function governedGlobs(config: AnchoringConfig, arch: Architecture): readonly string[] {
+  const governed = config.governedPaths.map(globForPath)
+  const roots = arch.moduleRoots.map(globForPath)
+  if (governed.length > 0) return [...governed, ...roots]
+  return [...arch.layers.flatMap((layer) => layer.paths.map(globForPath)), ...roots]
+}
+
+function generateGuardsMjs(config: AnchoringConfig, arch: Architecture, hash: string): string {
+  const header = generateHeader(hash)
+  const allTargetPaths = governedGlobs(config, arch)
+
+  const targetFiles =
+    allTargetPaths.length > 0
+      ? allTargetPaths.map((p) => `      '${p}',`).join('\n')
+      : "      '**/*',"
+
+  const blocks: string[] = []
+
+  blocks.push(...generateSizeBlocks(arch, targetFiles))
+  blocks.push(...generateBaselineBlocks(arch))
+
+  blocks.push(...generateImportBlock(arch, targetFiles))
+  blocks.push(...generateSyntaxBlocks(arch, targetFiles))
 
   const body = `${header}export default [
 ${blocks.join(',\n')}
@@ -296,7 +412,7 @@ export function planGuards(config: AnchoringConfig): GuardsPlan {
 
   const hash = guardsHash(config.architecture)
   const depcruise = generateDepcruise(config.architecture, hash)
-  const guardsMjs = generateGuardsMjs(config.architecture, hash)
+  const guardsMjs = generateGuardsMjs(config, config.architecture, hash)
 
   return {
     files: [

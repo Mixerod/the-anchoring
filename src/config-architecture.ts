@@ -23,8 +23,25 @@
 
 export interface Layer {
   readonly name: string
-  readonly paths: readonly string[]     // repo-relative, POSIX, trailing slash
+  /** repo-relative, POSIX. A directory keeps its trailing slash; a file has none. */
+  readonly paths: readonly string[]
   readonly pure: boolean
+}
+
+/**
+ * A directory path gets a trailing slash; a *file* path must not.
+ *
+ * This looks cosmetic and is not. Every generated checker builds a matcher by
+ * concatenation - depcruise into `^src/render\.ts`, ESLint into a `src/render.ts` glob.
+ * Appending `/` unconditionally produced `src/render.ts/`, which no file can ever be, so
+ * **every layer rule and every size ceiling this tool generated matched nothing**:
+ * `kb guards --check` said `ok`, `depcruise` found no violations, and a domain module
+ * importing the app layer passed clean. See .anchor/incident/INC-0004.md.
+ */
+export function normaliseLayerPath(rawPath: string): string {
+  if (rawPath.endsWith('/')) return rawPath
+  // A final `.ext` is what distinguishes `src/render.ts` from a directory named `src/api`.
+  return /\.[a-zA-Z0-9]+$/.test(rawPath) ? rawPath : `${rawPath}/`
 }
 
 export interface Architecture {
@@ -33,7 +50,47 @@ export interface Architecture {
   readonly entryPoints: readonly string[]
   readonly maxFileLines: number
   readonly maxFunctionLines: number
+  /**
+   * Per-file exemptions from `maxFunctionLines`, each set to that file's longest function
+   * *today*. The ratchet: a new file is checked at the real limit immediately, an exempt
+   * file can never get worse, and the debt is a list that only shrinks.
+   *
+   * Every entry is pinned to the exact current worst by a test, so an entry cannot be
+   * raised to make a regression pass, and cannot be left behind once the function is split.
+   * An exemption nobody is forced to revisit is a limit that was quietly repealed.
+   */
+  readonly maxFunctionLinesBaseline: Readonly<Record<string, number>>
   readonly impureImports: readonly string[]
+  /**
+   * Files permitted to import `impureImports` directly - the I/O adapters themselves.
+   *
+   * This list used to live hand-written in the host's `eslint.config.js`, where it silently
+   * replaced the generated rule entirely (flat config overrides per rule key; it does not
+   * merge). Declaring it here keeps one source of truth and makes the exemptions reviewable
+   * in the same file as the matrix they bend.
+   */
+  readonly ioExemptions: readonly string[]
+  /**
+   * Project-specific `no-restricted-syntax` selectors, emitted alongside the generated ones.
+   *
+   * They live in config rather than in the host's ESLint file for the same reason: two
+   * config objects declaring one rule do not merge, so whichever is listed last wins and the
+   * other vanishes without a word.
+   */
+  readonly restrictedSyntax: readonly RestrictedSyntax[]
+  /**
+   * The message on an impure-import violation. `{module}` is replaced with the specifier.
+   *
+   * Configurable because the sentence worth printing is the one naming *this project's*
+   * invariant. A message that explains nothing teaches people to reach for an
+   * eslint-disable rather than to move the import.
+   */
+  readonly ioMessage: string
+}
+
+export interface RestrictedSyntax {
+  readonly selector: string
+  readonly message: string
 }
 
 export const DEFAULT_ENTRY_POINTS: readonly string[] = [
@@ -44,6 +101,9 @@ export const DEFAULT_ENTRY_POINTS: readonly string[] = [
 
 export const DEFAULT_MAX_FILE_LINES = 400
 export const DEFAULT_MAX_FUNCTION_LINES = 50
+
+export const DEFAULT_IO_MESSAGE =
+  'Import {module} only from a declared I/O adapter; elsewhere, pass the value in as an argument.'
 
 export const DEFAULT_IMPURE_IMPORTS: readonly string[] = [
   'node:fs',
@@ -59,7 +119,11 @@ export const KNOWN_ARCHITECTURE_KEYS = [
   'entryPoints',
   'maxFileLines',
   'maxFunctionLines',
+  'maxFunctionLinesBaseline',
   'impureImports',
+  'ioExemptions',
+  'restrictedSyntax',
+  'ioMessage',
 ] as const
 
 export const KNOWN_LAYER_KEYS = ['name', 'paths', 'pure'] as const
@@ -72,6 +136,116 @@ export function isInvalidPosixRelPath(path: string): boolean {
     path.includes('..') ||
     path.includes('\\')
   )
+}
+
+/**
+ * Per-file `max-lines-per-function` exemptions.
+ *
+ * Rejected rather than accepted silently: a non-integer, a zero, or a negative. An
+ * exemption list is the one place where a typo reads as "this file is exempt from
+ * everything", so it is the last place to be forgiving about shape.
+ */
+/**
+ * A path may belong to exactly one layer.
+ *
+ * Overlap is a config error rather than a warning because it makes the direction of an
+ * import ambiguous: if `src/a.ts` is both domain and app, every rule mentioning either layer
+ * quietly means something different from what it reads like.
+ */
+function overlappingPaths(layers: readonly Layer[]): readonly string[] {
+  const problems: string[] = []
+
+  for (let i = 0; i < layers.length; i++) {
+    const layerA = layers[i]
+    if (!layerA) continue
+    for (let j = i; j < layers.length; j++) {
+      const layerB = layers[j]
+      if (!layerB) continue
+      for (let pAIdx = 0; pAIdx < layerA.paths.length; pAIdx++) {
+        const pA = layerA.paths[pAIdx]
+        if (!pA) continue
+        for (let pBIdx = i === j ? pAIdx + 1 : 0; pBIdx < layerB.paths.length; pBIdx++) {
+          const pB = layerB.paths[pBIdx]
+          if (!pB) continue
+          if (pA !== pB && !pA.startsWith(pB) && !pB.startsWith(pA)) continue
+          problems.push(
+            i === j
+              ? `layer \`${layerA.name}\` has overlapping paths: \`${pA}\` and \`${pB}\``
+              : `layers \`${layerA.name}\` and \`${layerB.name}\` claim overlapping paths (\`${pA}\` and \`${pB}\`)`,
+          )
+        }
+      }
+    }
+  }
+  return problems
+}
+
+function parseIoMessage(raw: unknown, problems: string[]): string {
+  if (raw === undefined) return DEFAULT_IO_MESSAGE
+  if (typeof raw !== 'string' || raw.trim() === '') {
+    problems.push('`ioMessage` must be a non-empty string')
+    return DEFAULT_IO_MESSAGE
+  }
+  return raw
+}
+
+function parseStringList(raw: unknown, name: string, problems: string[]): readonly string[] {
+  if (raw === undefined) return []
+  if (!Array.isArray(raw) || raw.some((x: unknown) => typeof x !== 'string' || x.trim() === '')) {
+    problems.push(`\`${name}\` must be an array of non-empty strings`)
+    return []
+  }
+  return raw as readonly string[]
+}
+
+function parseRestrictedSyntax(raw: unknown, problems: string[]): readonly RestrictedSyntax[] {
+  if (raw === undefined) return []
+  if (!Array.isArray(raw)) {
+    problems.push('`restrictedSyntax` must be an array of { selector, message }')
+    return []
+  }
+
+  const out: RestrictedSyntax[] = []
+  for (const entry of raw as readonly unknown[]) {
+    const obj = entry as { selector?: unknown; message?: unknown } | null
+    if (
+      obj === null ||
+      typeof obj !== 'object' ||
+      typeof obj.selector !== 'string' ||
+      obj.selector.trim() === '' ||
+      typeof obj.message !== 'string' ||
+      obj.message.trim() === ''
+    ) {
+      // A selector with no message is a rule that fires and explains nothing, which is
+      // how a checker teaches people to disable it rather than to fix the code.
+      problems.push('each `restrictedSyntax` entry needs a non-empty `selector` and `message`')
+      continue
+    }
+    out.push({ selector: obj.selector, message: obj.message })
+  }
+  return out
+}
+
+function parseBaseline(raw: unknown, problems: string[]): Readonly<Record<string, number>> {
+  if (raw === undefined) return {}
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    problems.push('`maxFunctionLinesBaseline` must be an object of path -> line count')
+    return {}
+  }
+
+  const baseline: Record<string, number> = {}
+  for (const [path, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (isInvalidPosixRelPath(path)) {
+      problems.push(
+        `\`maxFunctionLinesBaseline\` key \`${path}\` must be a repo-relative POSIX path`,
+      )
+    } else if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+      problems.push(`\`maxFunctionLinesBaseline.${path}\` must be a positive integer`)
+    } else {
+      baseline[path] = value
+    }
+  }
+  return baseline
 }
 
 export function parseArchitecture(
@@ -143,8 +317,7 @@ export function parseArchitecture(
                 `layer \`${name || i}\` path \`${rawPath}\` must be a repo-relative POSIX path (cannot be absolute, contain \`..\`, or contain backslashes)`,
               )
             } else {
-              const normalised = rawPath.endsWith('/') ? rawPath : `${rawPath}/`
-              paths.push(normalised)
+              paths.push(normaliseLayerPath(rawPath))
             }
           }
         }
@@ -170,35 +343,7 @@ export function parseArchitecture(
         problems.push('more than one layer has pure: true')
       }
 
-      // Check overlapping paths across layers and within the same layer
-      for (let i = 0; i < layers.length; i++) {
-        const layerA = layers[i]
-        if (!layerA) continue
-        for (let j = i; j < layers.length; j++) {
-          const layerB = layers[j]
-          if (!layerB) continue
-          for (let pAIdx = 0; pAIdx < layerA.paths.length; pAIdx++) {
-            const pA = layerA.paths[pAIdx]
-            if (!pA) continue
-            const startPBIdx = i === j ? pAIdx + 1 : 0
-            for (let pBIdx = startPBIdx; pBIdx < layerB.paths.length; pBIdx++) {
-              const pB = layerB.paths[pBIdx]
-              if (!pB) continue
-              if (pA === pB || pA.startsWith(pB) || pB.startsWith(pA)) {
-                if (i === j) {
-                  problems.push(
-                    `layer \`${layerA.name}\` has overlapping paths: \`${pA}\` and \`${pB}\``,
-                  )
-                } else {
-                  problems.push(
-                    `layers \`${layerA.name}\` and \`${layerB.name}\` claim overlapping paths (\`${pA}\` and \`${pB}\`)`,
-                  )
-                }
-              }
-            }
-          }
-        }
-      }
+      problems.push(...overlappingPaths(layers))
     }
   }
 
@@ -284,12 +429,21 @@ export function parseArchitecture(
     }
   }
 
+  const maxFunctionLinesBaseline = parseBaseline(rawArchObj['maxFunctionLinesBaseline'], problems)
+  const ioExemptions = parseStringList(rawArchObj['ioExemptions'], 'ioExemptions', problems)
+  const restrictedSyntax = parseRestrictedSyntax(rawArchObj['restrictedSyntax'], problems)
+  const ioMessage = parseIoMessage(rawArchObj['ioMessage'], problems)
+
   return {
     layers,
     moduleRoots,
     entryPoints,
     maxFileLines,
     maxFunctionLines,
+    maxFunctionLinesBaseline,
     impureImports,
+    ioExemptions,
+    restrictedSyntax,
+    ioMessage,
   }
 }

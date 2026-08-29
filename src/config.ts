@@ -16,6 +16,7 @@ import {
   DEFAULT_MAX_FILE_LINES,
   DEFAULT_MAX_FUNCTION_LINES,
   DEFAULT_IMPURE_IMPORTS,
+  DEFAULT_IO_MESSAGE,
 } from './config-architecture.js'
 
 export type { Layer, Architecture }
@@ -24,6 +25,7 @@ export {
   DEFAULT_MAX_FILE_LINES,
   DEFAULT_MAX_FUNCTION_LINES,
   DEFAULT_IMPURE_IMPORTS,
+  DEFAULT_IO_MESSAGE,
 }
 
 /**
