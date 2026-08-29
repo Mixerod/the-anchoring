@@ -28,6 +28,14 @@
     "ceiling": 24
   },
   "symbolIndex": "none",
+  "tags": {
+    "vocabulary": [
+      "layer-4",
+      "layer-5",
+      "retrieval",
+      "context-economy"
+    ]
+  },
   "architecture": {
     "layers": [
       {
