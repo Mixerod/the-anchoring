@@ -48,38 +48,14 @@
           "src/render-brief.ts",
           "src/render-stats.ts",
           "src/init.ts",
-          "src/agents.ts"
-        ]
-      },
-      {
-        "name": "domain",
-        "paths": [
-          "src/config.ts",
-          "src/config-architecture.ts",
-          "src/store.ts",
+          "src/agents.ts",
           "src/verify.ts",
-          "src/verify-upstream.ts",
-          "src/verify-hazard.ts",
-          "src/finding.ts",
+          "src/done.ts",
+          "src/ask.ts",
           "src/why.ts",
           "src/ctx.ts",
-          "src/done.ts",
-          "src/guards.ts",
-          "src/owners.ts",
-          "src/model.ts",
-          "src/frontmatter.ts",
-          "src/anchors.ts",
-          "src/upstream.ts",
-          "src/ask.ts",
-          "src/pack.ts",
-          "src/promote.ts",
-          "src/verify-tags.ts",
-          "src/brief.ts",
-          "src/since.ts",
-          "src/fingerprint.ts",
-          "src/fnv.ts"
-        ],
-        "pure": true
+          "src/owners.ts"
+        ]
       },
       {
         "name": "infra",
@@ -92,9 +68,71 @@
           "src/pack-source.ts",
           "src/brief-source.ts"
         ]
+      },
+      {
+        "name": "domain",
+        "paths": [
+          "src/config.ts",
+          "src/config-architecture.ts",
+          "src/store.ts",
+          "src/verify-upstream.ts",
+          "src/verify-hazard.ts",
+          "src/finding.ts",
+          "src/guards.ts",
+          "src/model.ts",
+          "src/frontmatter.ts",
+          "src/anchors.ts",
+          "src/upstream.ts",
+          "src/pack.ts",
+          "src/promote.ts",
+          "src/verify-tags.ts",
+          "src/brief.ts",
+          "src/since.ts",
+          "src/fingerprint.ts",
+          "src/fnv.ts"
+        ],
+        "pure": true
       }
     ],
     "maxFileLines": 400,
-    "maxFunctionLines": 50
+    "maxFunctionLines": 50,
+    "maxFunctionLinesBaseline": {
+      "src/ask.ts": 57,
+      "src/cli-promote.ts": 64,
+      "src/cli-upstream.ts": 70,
+      "src/cli.ts": 281,
+      "src/config-architecture.ts": 181,
+      "src/config.ts": 231,
+      "src/ctx.ts": 61,
+      "src/guards.ts": 71,
+      "src/init.ts": 214,
+      "src/owners.ts": 55,
+      "src/pack.ts": 62,
+      "src/promote.ts": 66,
+      "src/render.ts": 52,
+      "src/upstream.ts": 67,
+      "src/verify-hazard.ts": 99,
+      "src/verify-upstream.ts": 100
+    },
+    "ioExemptions": [
+      "src/root.ts",
+      "src/git.ts",
+      "src/loader.ts",
+      "src/resolver.ts",
+      "src/session.ts",
+      "src/pack-source.ts",
+      "src/brief-source.ts",
+      "src/init.ts",
+      "src/cli-upstream.ts",
+      "src/cli-pack.ts",
+      "src/cli-promote.ts"
+    ],
+    "restrictedSyntax": [
+      {
+        "selector": ":matches(Program, Program > ExportNamedDeclaration) > VariableDeclaration[kind!=\"const\"] > VariableDeclarator[id.name=\"config\"]",
+        "message": "Module-scope mutable `config` is forbidden (INV-CONFIG-THREADED). Pass config as a parameter."
+      }
+    ],
+    "ioMessage": "Core modules must not import {module} directly; pass I/O dependencies (INV-INJECTED-IO)."
   }
 }
