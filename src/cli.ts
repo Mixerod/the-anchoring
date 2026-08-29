@@ -19,7 +19,6 @@ import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type I
 import { planGuards, checkGuards } from './guards.js'
 import { liveExpectations, checkLiveRules } from './guards-live.js'
 import { updateAgentsMd } from './agents.js'
-import { planOwners } from './owners.js'
 import { ask } from './ask.js'
 import { verify } from './verify.js'
 import { why } from './why.js'
@@ -34,6 +33,8 @@ import { progressNotice, verifyCommand } from './cli-verify.js'
 import { runUpstream } from './cli-upstream.js'
 import { packCommand } from './cli-pack.js'
 import { promoteCommand } from './cli-promote.js'
+import { skillsCommand } from './cli-skills.js'
+import { ownersCommand } from './cli-owners.js'
 
 /**
  * Whether this module is the program being run, rather than a module being imported.
@@ -419,48 +420,11 @@ export function run(
     case 'guards':
       return guardsCommand(config, rest, out, err)
 
-    case 'owners': {
-      const probe = defaultFsProbe(config.root)
-      const io = defaultInitIo(config.root)
-      const targetPath = probe('.github') ? '.github/CODEOWNERS' : 'CODEOWNERS'
-      const existing = io.readFile(targetPath)
-      const report = planOwners(config, probe, existing)
+    case 'owners':
+      return ownersCommand(config, rest, out)
 
-      if (rest.includes('--check')) {
-        if (report.mappings.length === 0) {
-          out('CODEOWNERS: ok (no owners declared)')
-          return 0
-        }
-        if (existing === undefined) {
-          out(`${report.targetFile}: missing`)
-          return 1
-        }
-        if (existing !== report.renderedContent) {
-          out(`${report.targetFile}: stale`)
-          return 1
-        }
-        out(`${report.targetFile}: ok`)
-        return 0
-      }
-
-      if (report.mappings.length === 0) {
-        out('kb owners: no owners declared in any entity.')
-        return 0
-      }
-
-      out('Path                           Owner       Via')
-      out('------------------------------ ----------- --------')
-      for (const m of report.mappings) {
-        out(`${m.path.padEnd(30)} ${m.owner.padEnd(11)} ${m.via}`)
-      }
-      for (const note of report.notes) {
-        out(note)
-      }
-
-      io.writeFile(report.targetFile, report.renderedContent)
-      out(`\nkb owners: wrote ${report.targetFile}`)
-      return 0
-    }
+    case 'skills':
+      return skillsCommand(config, out, palette)
 
     case 'upstream':
       return runUpstream(config, rest, out, err)

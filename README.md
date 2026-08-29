@@ -88,7 +88,38 @@ npx kb ctx <W-id>              # progressive disclosure: all context that bears 
 npx kb why <path|symbol|id>    # reverse walk: what this code or entity is for
 npx kb done <W-id>             # closing check: diff vs claims
 npx kb verify [--strict]       # machine check every claim across the repository
+npx kb skills                  # what agent skills cost, and which ones the graph justifies
 ```
+
+### Agent skills (`kb skills`)
+
+If your repository delivers agent skills through the
+[@skills protocol](https://github.com/SylphAI-Inc/atskills) — a `.atskills/` directory and a
+`.atskills/.autotrigger` file — `kb skills` weighs what that costs and checks it against the
+intent graph.
+
+Only `.autotrigger` lines cost resident prompt tokens, and the protocol's own recommendation
+is to keep them under ten. This command prints that budget with a token estimate, and warns
+about every resident skill that **no document anchors**:
+
+```
+Tier 3 - .atskills/.autotrigger (2 skills, ~34 tok/message, estimated at 4 bytes/token)
+  [ok]   team-flows/deploy  ~21 tok  <- W-16
+  [warn] team-flows/review  ~13 tok  <- nothing in the graph anchors it
+```
+
+A skill earns its residency the same way anything else in this repository does: a document
+says why. Anchor it from a work item, invariant, or decision with an ordinary `file:` anchor —
+no new anchor form is involved, because a skill folder is an ordinary path:
+
+```yaml
+touches:
+  - file:.atskills/team-flows/deploy
+```
+
+**`kb skills` never writes.** `.atskills/` belongs to your project and to the protocol, not to
+this tool, so a suggested line is printed for you to paste. The check is advisory and always
+exits 0: a gate that blocks on bookkeeping is one you switch off within a week.
 
 ## License
 
