@@ -14,8 +14,10 @@
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { findRepoRoot, loadConfig, realPath } from './root.js'
+import type { AnchoringConfig, Architecture } from './config.js'
 import { defaultFsProbe, defaultInitIo, findGitRoot, planInit, applyInit, type InitPlan } from './init.js'
 import { planGuards, checkGuards } from './guards.js'
+import { liveExpectations, checkLiveRules } from './guards-live.js'
 import { updateAgentsMd } from './agents.js'
 import { planOwners } from './owners.js'
 import { ask } from './ask.js'
@@ -26,6 +28,7 @@ import { done, unclaimedWork } from './done.js'
 import { USAGE, choosePalette, renderAsk, renderCtx, renderDone, renderNoProgress, renderUnclaimed, renderWhy, type ColourEnv } from './render.js'
 import { gitChangedFiles, type ChangedFiles } from './git.js'
 import { recallWork, rememberWork } from './session.js'
+import { printConfig } from './eslint-probe.js'
 import { briefCommand } from './cli-brief.js'
 import { progressNotice, verifyCommand } from './cli-verify.js'
 import { runUpstream } from './cli-upstream.js'
@@ -74,6 +77,153 @@ function colourEnv(rest: readonly string[]): ColourEnv {
     noColorFlag: rest.includes('--no-color') || rest.includes('--no-colour'),
     colorFlag: rest.includes('--color') || rest.includes('--colour'),
   }
+}
+
+/**
+ * `kb guards --verify-live` - is the generated rule actually in force?
+ *
+ * `--check` proves the file on disk matches the generator. It cannot prove the host's ESLint
+ * config did not discard it afterwards, and flat config discards by default: a later object
+ * naming a rule replaces the earlier one entirely, with no error and no output. This asks
+ * ESLint directly, through the host's own config resolution.
+ */
+/** `kb guards` - generate, check, or verify the architecture checkers. */
+function guardsCommand(
+  config: AnchoringConfig,
+  rest: readonly string[],
+  out: (text: string) => void,
+  err: (text: string) => void,
+): number {
+
+      if (!config.architecture) {
+        err(
+          'kb guards: no "architecture" block in anchoring.config.json — nothing to generate.\n\n' +
+            'Example "architecture" block to add to anchoring.config.json:\n' +
+            '{\n' +
+            '  "architecture": {\n' +
+            '    "layers": [\n' +
+            '      { "name": "ui", "paths": ["src/ui/", "apps/"] },\n' +
+            '      { "name": "domain", "paths": ["src/domain/"], "pure": true }\n' +
+            '    ],\n' +
+            '    "maxFileLines": 400,\n' +
+            '    "maxFunctionLines": 50\n' +
+            '  }\n' +
+            '}',
+        )
+        return 1
+      }
+
+      const probe = defaultFsProbe(config.root)
+      if (!probe('package.json')) {
+        err('kb guards: generated checkers currently target TypeScript/JavaScript projects only.')
+        return 1
+      }
+
+      const plan = planGuards(config)
+
+      if (rest.includes('--verify-live')) {
+        return verifyLive(config, config.architecture, plan, rest, out, err)
+      }
+
+      if (rest.includes('--dry-run')) {
+        for (const file of plan.files) {
+          out(`--- ${file.path} ---\n${file.body}`)
+        }
+        return 0
+      }
+
+      const io = defaultInitIo(config.root)
+
+      if (rest.includes('--check')) {
+        const results = checkGuards(plan, io.readFile)
+        let allOk = true
+        for (const res of results) {
+          out(`${res.path}: ${res.state}`)
+          if (res.state !== 'ok') {
+            allOk = false
+          }
+        }
+        const existingAgents = io.readFile('AGENTS.md')
+        if (existingAgents !== undefined) {
+          const agentsRes = updateAgentsMd(existingAgents, config.architecture)
+          if (agentsRes.updated) {
+            if (agentsRes.content !== existingAgents) {
+              out('AGENTS.md: stale')
+              allOk = false
+            } else {
+              out('AGENTS.md: ok')
+            }
+          }
+        }
+        return allOk ? 0 : 1
+      }
+
+      for (const file of plan.files) {
+        io.writeFile(file.path, file.body)
+        out(`kb guards: wrote ${file.path}`)
+      }
+      const existingAgents = io.readFile('AGENTS.md')
+      if (existingAgents !== undefined) {
+        const agentsRes = updateAgentsMd(existingAgents, config.architecture)
+        if (agentsRes.updated) {
+          if (agentsRes.content !== existingAgents) {
+            io.writeFile('AGENTS.md', agentsRes.content)
+            out('kb guards: updated AGENTS.md')
+          }
+        } else if (agentsRes.note) {
+          out(agentsRes.note)
+        }
+      }
+      for (const note of plan.notes) {
+        out(`\n${note}`)
+      }
+      return 0
+}
+
+function verifyLive(
+  config: AnchoringConfig,
+  architecture: Architecture,
+  plan: ReturnType<typeof planGuards>,
+  rest: readonly string[],
+  out: (text: string) => void,
+  err: (text: string) => void,
+): number {
+  const file = rest.find((a) => !a.startsWith('-') && a !== 'guards') ?? pureSample(config)
+
+  if (!file) {
+    err('usage: kb guards --verify-live <a-file-the-rules-should-cover>')
+    return 2
+  }
+
+  const applied = printConfig(config.root, file)
+  if (!applied) {
+    // Could not tell. Never reported as a pass: a verifier that reads its own failure as
+    // success is worse than no verifier at all.
+    err(`kb guards: could not read ESLint's effective config for ${file}.`)
+    err('  is eslint installed, and does your config load without error?')
+    return 2
+  }
+
+  const report = checkLiveRules(file, liveExpectations(architecture, file), applied)
+  out(`kb guards --verify-live: ${file}`)
+  for (const e of report.satisfied) out(`  in force   ${e.rule}  ${e.needle}`)
+  for (const e of report.missing) out(`  MISSING    ${e.rule}  ${e.needle}  — ${e.why}`)
+
+  if (report.missing.length === 0) {
+    out(`  ${report.satisfied.length} generated guarantee(s) survive composition.`)
+    return 0
+  }
+
+  err(`kb guards: ${report.missing.length} generated guarantee(s) are not applied to ${file}.`)
+  err('  A config object after `...anchoringGuards` names the same rule and replaces it.')
+  err('  Move your own selectors into anchoring.config.json (restrictedSyntax, ioExemptions).')
+  return 1
+}
+
+/** A file the pure-layer rules should cover, for use when the caller names none. */
+function pureSample(config: AnchoringConfig): string | undefined {
+  const pure = config.architecture?.layers.find((l) => l.pure)
+  return pure?.paths.find((p) => !p.endsWith('/'))
 }
 
 export function run(
@@ -266,87 +416,8 @@ export function run(
       return 0
     }
 
-    case 'guards': {
-      if (!config.architecture) {
-        err(
-          'kb guards: no "architecture" block in anchoring.config.json — nothing to generate.\n\n' +
-            'Example "architecture" block to add to anchoring.config.json:\n' +
-            '{\n' +
-            '  "architecture": {\n' +
-            '    "layers": [\n' +
-            '      { "name": "ui", "paths": ["src/ui/", "apps/"] },\n' +
-            '      { "name": "domain", "paths": ["src/domain/"], "pure": true }\n' +
-            '    ],\n' +
-            '    "maxFileLines": 400,\n' +
-            '    "maxFunctionLines": 50\n' +
-            '  }\n' +
-            '}',
-        )
-        return 1
-      }
-
-      const probe = defaultFsProbe(config.root)
-      if (!probe('package.json')) {
-        err('kb guards: generated checkers currently target TypeScript/JavaScript projects only.')
-        return 1
-      }
-
-      const plan = planGuards(config)
-
-      if (rest.includes('--dry-run')) {
-        for (const file of plan.files) {
-          out(`--- ${file.path} ---\n${file.body}`)
-        }
-        return 0
-      }
-
-      const io = defaultInitIo(config.root)
-
-      if (rest.includes('--check')) {
-        const results = checkGuards(plan, io.readFile)
-        let allOk = true
-        for (const res of results) {
-          out(`${res.path}: ${res.state}`)
-          if (res.state !== 'ok') {
-            allOk = false
-          }
-        }
-        const existingAgents = io.readFile('AGENTS.md')
-        if (existingAgents !== undefined) {
-          const agentsRes = updateAgentsMd(existingAgents, config.architecture)
-          if (agentsRes.updated) {
-            if (agentsRes.content !== existingAgents) {
-              out('AGENTS.md: stale')
-              allOk = false
-            } else {
-              out('AGENTS.md: ok')
-            }
-          }
-        }
-        return allOk ? 0 : 1
-      }
-
-      for (const file of plan.files) {
-        io.writeFile(file.path, file.body)
-        out(`kb guards: wrote ${file.path}`)
-      }
-      const existingAgents = io.readFile('AGENTS.md')
-      if (existingAgents !== undefined) {
-        const agentsRes = updateAgentsMd(existingAgents, config.architecture)
-        if (agentsRes.updated) {
-          if (agentsRes.content !== existingAgents) {
-            io.writeFile('AGENTS.md', agentsRes.content)
-            out('kb guards: updated AGENTS.md')
-          }
-        } else if (agentsRes.note) {
-          out(agentsRes.note)
-        }
-      }
-      for (const note of plan.notes) {
-        out(`\n${note}`)
-      }
-      return 0
-    }
+    case 'guards':
+      return guardsCommand(config, rest, out, err)
 
     case 'owners': {
       const probe = defaultFsProbe(config.root)

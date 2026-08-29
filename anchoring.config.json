@@ -74,7 +74,8 @@
           "src/resolver.ts",
           "src/session.ts",
           "src/pack-source.ts",
-          "src/brief-source.ts"
+          "src/brief-source.ts",
+          "src/eslint-probe.ts"
         ]
       },
       {
@@ -97,7 +98,8 @@
           "src/brief.ts",
           "src/since.ts",
           "src/fingerprint.ts",
-          "src/fnv.ts"
+          "src/fnv.ts",
+          "src/guards-live.ts"
         ],
         "pure": true
       }
@@ -108,7 +110,7 @@
       "src/ask.ts": 57,
       "src/cli-promote.ts": 64,
       "src/cli-upstream.ts": 70,
-      "src/cli.ts": 281,
+      "src/cli.ts": 208,
       "src/config-architecture.ts": 181,
       "src/config.ts": 231,
       "src/ctx.ts": 61,
@@ -133,7 +135,8 @@
       "src/init.ts",
       "src/cli-upstream.ts",
       "src/cli-pack.ts",
-      "src/cli-promote.ts"
+      "src/cli-promote.ts",
+      "src/eslint-probe.ts"
     ],
     "restrictedSyntax": [
       {

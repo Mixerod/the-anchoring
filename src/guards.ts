@@ -395,6 +395,19 @@ ${blocks.join(',\n')}
   return body
 }
 
+/**
+ * The rule names this generator owns. A host config that declares any of them replaces the
+ * generated one outright, because flat config does not merge rules.
+ */
+export const GENERATED_RULES: readonly string[] = [
+  'max-lines',
+  'max-lines-per-function',
+  'no-restricted-imports',
+  'no-restricted-syntax',
+  'no-restricted-globals',
+  'no-restricted-properties',
+]
+
 export const COMPOSE_INSTRUCTIONS = `Add these two lines to compose the guards with your own config:
 
   eslint.config.js         import anchoringGuards from './anchoring.guards.mjs'
@@ -403,7 +416,25 @@ export const COMPOSE_INSTRUCTIONS = `Add these two lines to compose the guards w
   .dependency-cruiser.cjs  const anchoring = require('./anchoring.depcruise.cjs')
                            forbidden: [ ...anchoring.forbidden, /* your rules */ ]
 
-  CI                       npx kb guards --check && npx eslint . && npx depcruise src`
+  CI                       npx kb guards --check && npx eslint . && npx depcruise src
+
+WARNING — ESLint flat config REPLACES a rule, it does not merge it.
+
+  If any config object after \`...anchoringGuards\` names one of these rules, it silently
+  switches the generated one off for every file it matches, with no error and no output:
+
+    ${GENERATED_RULES.join(', ')}
+
+  This is not hypothetical. In this tool's own repository, a hand-written block sitting
+  after the spread disabled the pure layer's ban on Node's network and cryptography imports,
+  and nothing said so for months. See INC-0004.
+
+  Put your own selectors and exemptions in anchoring.config.json instead — \`restrictedSyntax\`,
+  \`ioExemptions\`, \`ioMessage\` — so they are emitted into the same objects and compose
+  rather than collide.
+
+  Then check it, rather than trusting it:  npx kb guards --verify-live`
+
 
 export function planGuards(config: AnchoringConfig): GuardsPlan {
   if (!config.architecture) {
