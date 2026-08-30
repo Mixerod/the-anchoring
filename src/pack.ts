@@ -286,6 +286,29 @@ export function planPack(
   }
 }
 
+/**
+ * Has this repository adopted this pack?
+ *
+ * A pack that exists is not a pack that is in use. `kb pack check` must report drift in what
+ * was seeded and stay silent about what was not, or every pack an adopter declined becomes a
+ * wall of `missing` — and under `--strict`, a failed build caused entirely by a pack nobody
+ * asked for.
+ *
+ * Adoption is evidence, not configuration: at least one of the pack's files exists at its
+ * destination. Nothing has to be recorded, and removing the last seeded file un-adopts it,
+ * which is the behaviour a reader would predict.
+ *
+ * Pure: the caller supplies `read`, so this is testable with no filesystem. See INC-0005 for
+ * what the impure version cost.
+ */
+export function isAdopted(
+  pack: Pack,
+  config: AnchoringConfig,
+  read: (relPath: string) => string | undefined,
+): boolean {
+  return pack.files.some((f) => read(targetPathForFile(f.kind, f.basename, config)) !== undefined)
+}
+
 export function checkPack(
   pack: Pack,
   config: AnchoringConfig,

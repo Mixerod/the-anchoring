@@ -310,13 +310,32 @@ describe('Pack resolution and apply', () => {
 })
 
 describe('CLI kb pack commands and init --pack integration', () => {
+  /**
+   * INC-0005: the adoption filter was disabled by a trailing `|| true`, and no test could have
+   * caught it while one pack existed. This is the case where it must exclude something.
+   */
+  test('kb pack check ignores packs this repository has not adopted', () => {
+    const root = makeTemp('kb-pack-adopt-')
+    run(['init', '--no-colour'], () => {}, () => {}, root)
+    run(['pack', 'add', 'discipline', '--no-colour'], () => {}, () => {}, root)
+
+    const out: string[] = []
+    const code = run(['pack', 'check', '--strict', '--no-colour'], (t) => out.push(t), () => {}, root)
+    const text = out.join('\n')
+
+    expect(code).toBe(0)
+    expect(text).toContain('discipline')
+    expect(text).not.toContain('missing')
+    expect(text).toContain('not adopted, so not checked: systems-async')
+  })
+
   test('kb pack list displays built-in discipline pack', () => {
     const out: string[] = []
     const err: string[] = []
     const code = run(['pack', 'list', '--no-colour'], (t) => out.push(t), (t) => err.push(t))
     expect(code).toBe(0)
-    // 1.2.0 adds doctrine/tags-are-hints.md alongside the Layer 5 tag checker.
-    expect(out.join('\n')).toContain('discipline (1.2.0)')
+    // 1.3.0 gives every doctrine file `when:` triggers, so `kb ask` can rank it.
+    expect(out.join('\n')).toContain('discipline (1.3.0)')
     expect(out.join('\n')).toContain('1 invariant, 6 doctrines, 2 hazards, 1 script')
   })
 

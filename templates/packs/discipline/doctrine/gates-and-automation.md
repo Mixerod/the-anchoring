@@ -1,3 +1,13 @@
+---
+title: Gates and Automation
+tags: [gates, ci, automation, hooks]
+when:
+  - a check is about to be made blocking
+  - a gate stayed silent on the case it was built for
+  - something must run on every turn and cost must stay negligible
+  - a bookkeeping rule is being enforced by failing the build
+---
+
 # Gates and Automation
 
 Balancing mechanical gates with agent developer workflow.

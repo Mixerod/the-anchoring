@@ -164,10 +164,11 @@ private repository to an upstream project is a data-exfiltration path with a fri
 
 ---
 
-## The four commands
+## The commands
 
 | Command | Answers | Run by |
 |---|---|---|
+| `kb ask "<question>"` | what bears on a topic, and which technique the situation calls for | the agent, before a work item exists |
 | `kb ctx <W-id>` | everything that bears on this work | the agent, before starting |
 | `kb why <path\|symbol\|id>` | what this is for, and what depends on that | anyone, any time |
 | `kb done <W-id>` | what still needs recording | the agent, before finishing |
@@ -176,6 +177,11 @@ private repository to an upstream project is a data-exfiltration path with a fri
 `kb why` is the payoff query. Given one file it returns the decision that governs it, the
 user flow it serves, the work that touched it, and any incident that happened there — the
 question a structural index structurally cannot answer.
+
+`kb ask` is the only one that returns knowledge which is not a claim about this repository.
+Doctrine files carry `when:` triggers — the situation that calls for a technique — and both
+`kb ask` and `kb ctx` rank them and print the trigger that fired. A trigger is scored, never
+verified: it is a hint in exactly the sense a tag is, and must never be cited as evidence.
 
 `kb done` is the one that makes the pattern survive. It does **not** ask the agent to
 remember anything: it reads `git diff`, compares it to what the intent graph claims, and

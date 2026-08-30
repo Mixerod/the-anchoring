@@ -1,6 +1,16 @@
-<!-- the-anchoring:pack discipline@1.1.0 hash:be9da09d07093a8f -->
+<!-- the-anchoring:pack discipline@1.3.0 hash:a15eb5caeb94fbdc -->
 <!-- Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
      hand-edited rather than overwrite it. -->
+
+---
+title: SOLID Principles in Practice
+tags: [design, oop, abstraction, refactoring]
+when:
+  - a class or module has taken on a second responsibility
+  - a change requires editing a switch in several places
+  - an interface forces implementers to stub methods they do not use
+  - concrete construction is hard-wired inside business logic
+---
 
 # SOLID Principles in Practice
 

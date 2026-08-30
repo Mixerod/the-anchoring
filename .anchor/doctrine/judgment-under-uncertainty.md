@@ -1,6 +1,15 @@
-<!-- the-anchoring:pack discipline@1.1.0 hash:15fd5a6fcf1f5779 -->
+<!-- the-anchoring:pack discipline@1.3.0 hash:0b3d8d2a3b3db7d7 -->
 <!-- Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
      hand-edited rather than overwrite it. -->
+
+---
+title: Judgment Under Uncertainty
+tags: [attribution, classification, triage]
+when:
+  - a dependency or tool is suspected of causing the failure
+  - an open-ended judgment is being asked of an agent
+  - a filter or classifier can never return no
+---
 
 # Judgment Under Uncertainty
 

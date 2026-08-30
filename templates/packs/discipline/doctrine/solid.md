@@ -1,3 +1,13 @@
+---
+title: SOLID Principles in Practice
+tags: [design, oop, abstraction, refactoring]
+when:
+  - a class or module has taken on a second responsibility
+  - a change requires editing a switch in several places
+  - an interface forces implementers to stub methods they do not use
+  - concrete construction is hard-wired inside business logic
+---
+
 # SOLID Principles in Practice
 
 A practical assessment of object-oriented and modular design principles.

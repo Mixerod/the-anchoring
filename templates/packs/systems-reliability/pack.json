@@ -1,0 +1,5 @@
+{
+  "name": "systems-reliability",
+  "version": "1.0.0",
+  "description": "Timeouts, retries, circuit breakers, backpressure, scaling shapes, and disaster recovery. Indexed doctrine: kb ask names a technique when the situation matches."
+}

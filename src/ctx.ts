@@ -12,7 +12,9 @@
 
 import { LINK_FIELDS } from './model.js'
 import { type Entity, type Store } from './store.js'
-import { loadStore } from './loader.js'
+import { loadStore, loadDoctrine } from './loader.js'
+import { rankDoctrine, type DoctrineMatch, type DoctrineSummary } from './doctrine.js'
+import { extractQueryTokens } from './tokens.js'
 import { hasCodegraphIndex } from './resolver.js'
 import type { AnchoringConfig } from './config.js'
 
@@ -37,6 +39,39 @@ export interface CtxReport {
   readonly anchors: readonly string[]
   readonly workDir?: string
   readonly indexed?: boolean
+  /**
+   * Techniques whose triggers match this work. Never more than DOCTRINE_IN_CTX.
+   *
+   * Distinct from every other section here, and the distinction is the point: those name
+   * documents that make a claim about this repository, and this one names knowledge that
+   * would be equally true in another. Which is why it is ranked and capped rather than
+   * returned in full — a technique is conditional, and a list of twelve conditional things
+   * is a reading list, not context.
+   */
+  readonly doctrine: readonly DoctrineMatch[]
+}
+
+/** Three is what fits between reading the work item and starting it. */
+export const DOCTRINE_IN_CTX = 3
+
+/**
+ * The query a work item makes of the doctrine corpus: its title and its tags.
+ *
+ * Not its body, and not its anchors. The body is the thing `kb ctx` exists to avoid
+ * loading, and a path like `src/pay/webhook.ts` tokenises into words that match techniques
+ * by accident — `webhook` would pull in every networking file whether or not the work has
+ * anything to do with delivery semantics.
+ */
+export function workQuery(subject: Entity): string {
+  const tags = subject.fields['tags'] ?? ''
+  return `${subject.title} ${tags}`
+}
+
+function doctrineFor(
+  subject: Entity,
+  docs: readonly DoctrineSummary[],
+): readonly DoctrineMatch[] {
+  return rankDoctrine(extractQueryTokens(workQuery(subject)), docs, DOCTRINE_IN_CTX).matched
 }
 
 function refs(entity: Entity, field: string, store: Store): readonly Entity[] {
@@ -68,6 +103,57 @@ function neighbours(subject: Entity, store: Store): readonly CtxEntry[] {
     })
 }
 
+/**
+ * The five sections, in the order an agent needs them: what decided this, what still binds
+ * it, what blocks it, what it closes, and what has already gone wrong on the same lines.
+ *
+ * Extracted from `ctx` when the doctrine section pushed the caller past its size baseline.
+ * Raising the baseline instead would have been loosening a threshold to hide a failure.
+ */
+function ctxSections(
+  subject: Entity,
+  store: Store,
+  entry: (via: string) => (e: Entity) => CtxEntry,
+): readonly CtxSection[] {
+  const decisions = [...refs(subject, 'implements', store)]
+  // A decision's invariants bind this work too, even though the work never names them.
+  const invariants = decisions.flatMap((d) => refs(d, 'constrains', store))
+  const incidents = refs(subject, 'closes', store)
+  const blockers = refs(subject, 'blocked_by', store)
+
+  const seen = new Set<string>()
+  const dedupe = (entries: readonly CtxEntry[]): readonly CtxEntry[] =>
+    entries.filter((e) => (seen.has(e.id) ? false : (seen.add(e.id), true)))
+
+  return [
+    {
+      heading: 'Decides this work',
+      entries: dedupe(decisions.map(entry('implements'))),
+      emptyNote: 'no decision or flow claimed - say what this work is for, or link one',
+    },
+    {
+      heading: 'Must still hold',
+      entries: dedupe(invariants.map(entry('via the decision above'))),
+      emptyNote: 'no invariant reachable from this work',
+    },
+    {
+      heading: 'Blocked by',
+      entries: dedupe(blockers.map(entry('blocked_by'))),
+      emptyNote: 'nothing',
+    },
+    {
+      heading: 'Closes',
+      entries: dedupe(incidents.map(entry('closes'))),
+      emptyNote: 'no incident',
+    },
+    {
+      heading: 'Has happened here before',
+      entries: dedupe(neighbours(subject, store)),
+      emptyNote: 'no prior record on the code this work touches',
+    },
+  ]
+}
+
 export function ctx(config: AnchoringConfig, query: string): CtxReport {
   const store = loadStore(config)
   const indexed = config.symbolIndex === 'codegraph' && hasCodegraphIndex(config)
@@ -79,6 +165,7 @@ export function ctx(config: AnchoringConfig, query: string): CtxReport {
       anchors: [],
       workDir: config.kinds.WORK.dir,
       indexed,
+      doctrine: [],
     }
   }
 
@@ -89,48 +176,13 @@ export function ctx(config: AnchoringConfig, query: string): CtxReport {
     via,
   })
 
-  const decisions = [...refs(subject, 'implements', store)]
-  // A decision's invariants bind this work too, even though the work never names them.
-  const invariants = decisions.flatMap((d) => refs(d, 'constrains', store))
-  const incidents = refs(subject, 'closes', store)
-  const blockers = refs(subject, 'blocked_by', store)
-
-  const seen = new Set<string>()
-  const dedupe = (entries: readonly CtxEntry[]): readonly CtxEntry[] =>
-    entries.filter((e) => (seen.has(e.id) ? false : (seen.add(e.id), true)))
-
   return {
     query,
     subject,
     anchors: anchorsOf(subject),
     workDir: config.kinds.WORK.dir,
     indexed,
-    sections: [
-      {
-        heading: 'Decides this work',
-        entries: dedupe(decisions.map(entry('implements'))),
-        emptyNote: 'no decision or flow claimed - say what this work is for, or link one',
-      },
-      {
-        heading: 'Must still hold',
-        entries: dedupe(invariants.map(entry('via the decision above'))),
-        emptyNote: 'no invariant reachable from this work',
-      },
-      {
-        heading: 'Blocked by',
-        entries: dedupe(blockers.map(entry('blocked_by'))),
-        emptyNote: 'nothing',
-      },
-      {
-        heading: 'Closes',
-        entries: dedupe(incidents.map(entry('closes'))),
-        emptyNote: 'no incident',
-      },
-      {
-        heading: 'Has happened here before',
-        entries: dedupe(neighbours(subject, store)),
-        emptyNote: 'no prior record on the code this work touches',
-      },
-    ],
+    doctrine: doctrineFor(subject, loadDoctrine(config)),
+    sections: ctxSections(subject, store, entry),
   }
 }

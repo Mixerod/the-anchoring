@@ -11,6 +11,7 @@ import type { WhyReport } from './why.js'
 import type { CtxReport } from './ctx.js'
 import type { DoneReport } from './done.js'
 import type { AskReport } from './ask.js'
+import type { DoctrineMatch, DoctrineRanking } from './doctrine.js'
 import type { SinceReport } from './since.js'
 
 const ESC = String.fromCharCode(27)
@@ -204,6 +205,28 @@ export const USAGE =
   '  kb upstream [--check]  project attributable incidents into reviewable reports\n' +
   '                         --list, --dry-run, --open-work <path-to-upstream-repo>\n'
 
+/**
+ * Techniques whose triggers fire on this work item.
+ *
+ * The empty note matters more than the entries. Silence would read as "no technique
+ * applies", when the truthful reading is almost always "no doctrine file has declared a
+ * trigger that matches" — a fact about the corpus, not about the work. Saying so is what
+ * turns an unhelpful section into an invitation to write the missing file.
+ */
+function renderCtxDoctrine(matches: readonly DoctrineMatch[], c: Palette): readonly string[] {
+  const lines = ['', `${c.bold}Technique that may apply${c.off}`]
+  if (matches.length === 0) {
+    lines.push(`  ${c.dim}no doctrine trigger matched this work - guidance is not the same as none${c.off}`)
+    return lines
+  }
+  for (const m of matches) {
+    lines.push(`  ${m.doc.title ?? m.doc.name}`)
+    if (m.trigger) lines.push(`    ${c.dim}when: ${m.trigger}${c.off}`)
+    lines.push(`    ${c.dim}${m.doc.path}${c.off}`)
+  }
+  return lines
+}
+
 export function renderCtx(report: CtxReport, c: Palette = COLOUR): string {
   const { subject } = report
   if (!subject) {
@@ -230,6 +253,8 @@ export function renderCtx(report: CtxReport, c: Palette = COLOUR): string {
       lines.push(`  ${' '.repeat(16)} ${c.dim}${e.path} - ${e.via}${c.off}`)
     }
   }
+
+  lines.push(...renderCtxDoctrine(report.doctrine, c))
 
   lines.push('', `${c.bold}Code this work touches${c.off}`)
   lines.push(
@@ -343,17 +368,41 @@ export function renderAsk(report: AskReport, c: Palette = COLOUR): string {
     }
   }
 
-  if (report.doctrine.length > 0) {
-    lines.push('', `${c.bold}Doctrine${c.off}`)
-    for (const doc of report.doctrine) {
-      const label = doc.title ? `${doc.name} - ${doc.title}` : doc.name
-      lines.push(`  ${label}`)
-      lines.push(`  ${' '.repeat(2)} ${c.dim}${doc.path}${c.off}`)
-    }
-  }
+  lines.push(...renderDoctrine(report.doctrine, c))
 
   lines.push(...renderExclusions(report, c))
   return lines.join('\n')
+}
+
+/**
+ * Doctrine, ranked, with the trigger that fired.
+ *
+ * The trigger line is printed rather than the filename alone because it is the evidence for
+ * the match: a reader can tell in one line whether "a retry could apply the same effect
+ * twice" is their situation, and cannot tell that from `idempotency.md`.
+ *
+ * Unmatched files are still named, on one compact line. A retrieval layer that silently
+ * drops half its corpus cannot be audited, and this corpus is small enough that the honesty
+ * costs a line.
+ */
+function renderDoctrine(ranking: DoctrineRanking, c: Palette): readonly string[] {
+  if (ranking.matched.length === 0 && ranking.unmatched.length === 0) return []
+
+  const lines: string[] = ['', `${c.bold}Doctrine${c.off}`]
+
+  for (const m of ranking.matched) {
+    const label = m.doc.title ? `${m.doc.name} - ${m.doc.title}` : m.doc.name
+    lines.push(`  ${label}`)
+    if (m.trigger) lines.push(`    ${c.dim}when: ${m.trigger}${c.off}`)
+    lines.push(`    ${c.dim}${m.doc.path}${c.off}`)
+  }
+
+  if (ranking.unmatched.length > 0) {
+    const heading = ranking.matched.length > 0 ? 'no trigger matched' : 'nothing matched'
+    lines.push(`  ${c.dim}${ranking.unmatched.length} more (${heading}): ${ranking.unmatched.map((d) => d.name).join(', ')}${c.off}`)
+  }
+
+  return lines
 }
 
 /**

@@ -1,6 +1,16 @@
-<!-- the-anchoring:pack discipline@1.1.0 hash:c4d112166bb87bbd -->
+<!-- the-anchoring:pack discipline@1.3.0 hash:7ae547d95d577649 -->
 <!-- Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
      hand-edited rather than overwrite it. -->
+
+---
+title: Verification and Honesty
+tags: [verification, reporting, testing, thresholds]
+when:
+  - work is about to be reported as complete
+  - a check failed and the threshold looks easier to change than the code
+  - a number in an acceptance criterion came out lower than stated
+  - code is being referenced by line number
+---
 
 # Verification and Honesty
 

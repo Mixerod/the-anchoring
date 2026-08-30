@@ -1,6 +1,16 @@
-<!-- the-anchoring:pack discipline@1.1.0 hash:f9ff901f901dd1d4 -->
+<!-- the-anchoring:pack discipline@1.3.0 hash:f4aad5720798f5f1 -->
 <!-- Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
      hand-edited rather than overwrite it. -->
+
+---
+title: Gates and Automation
+tags: [gates, ci, automation, hooks]
+when:
+  - a check is about to be made blocking
+  - a gate stayed silent on the case it was built for
+  - something must run on every turn and cost must stay negligible
+  - a bookkeeping rule is being enforced by failing the build
+---
 
 # Gates and Automation
 

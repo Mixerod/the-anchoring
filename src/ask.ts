@@ -7,7 +7,8 @@
  * 2. Always, in full: every active open hazard (HAZ-).
  * 3. Ranked by relevance: decisions (ADR-), user flows (FLOW-), work items (W-),
  *    and incidents (INC-).
- * 4. Doctrine file names and headings from `.anchor/doctrine/` if present.
+ * 4. Doctrine from `.anchor/doctrine/`, ranked by its `when:` triggers, with the trigger
+ *    line that matched. Unmatched doctrine is still named — ranking must not hide.
  *
  * Scoring matches on frontmatter only (id, title, tags) without loading document bodies.
  * Pure module: no filesystem I/O, no crypto, no clock. Rationale: docs/THE_ANCHORING.md.
@@ -15,85 +16,29 @@
 
 import { type Entity, type Store } from './store.js'
 import type { EntityKind } from './model.js'
-import { loadStore, loadDoctrine, type DoctrineSummary } from './loader.js'
+import { loadStore, loadDoctrine } from './loader.js'
 import type { AnchoringConfig } from './config.js'
+import {
+  extractQueryTokens,
+  fieldOverlap,
+  listTokens,
+  tokenise,
+} from './tokens.js'
+import {
+  rankDoctrine,
+  type DoctrineMatch,
+  type DoctrineRanking,
+  type DoctrineSummary,
+} from './doctrine.js'
 
-export const STOPWORDS = new Set([
-  'a',
-  'about',
-  'an',
-  'and',
-  'are',
-  'as',
-  'at',
-  'be',
-  'by',
-  'for',
-  'from',
-  'has',
-  'have',
-  'in',
-  'is',
-  'it',
-  'its',
-  'not',
-  'of',
-  'on',
-  'or',
-  'that',
-  'the',
-  'this',
-  'to',
-  'was',
-  'were',
-  'will',
-  'with',
-])
-
-export function tokenise(text: string): readonly string[] {
-  return text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length > 0 && !STOPWORDS.has(t))
-}
-
-export function extractQueryTokens(query: string): readonly string[] {
-  const filtered = tokenise(query)
-  if (filtered.length > 0) return filtered
-  return query
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length > 0)
-}
+/**
+ * Re-exported because they were part of this module's surface before `tokens.ts` existed.
+ * The implementation moved; the API did not.
+ */
+export { STOPWORDS, tokenise, extractQueryTokens } from './tokens.js'
 
 function entityTagTokens(entity: Entity): readonly string[] {
-  const raw = entity.fields['tags']
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (Array.isArray(parsed)) {
-      return parsed.flatMap((item) =>
-        String(item)
-          .toLowerCase()
-          .split(/[^a-z0-9]+/)
-          .filter((t) => t.length > 0 && !STOPWORDS.has(t)),
-      )
-    }
-  } catch {
-    // raw was a bare string rather than JSON
-  }
-  return tokenise(raw)
-}
-
-function fieldOverlap(fieldTokens: readonly string[], queryTokens: readonly string[]): number {
-  if (fieldTokens.length === 0 || queryTokens.length === 0) return 0
-  let matches = 0
-  for (const q of queryTokens) {
-    if (fieldTokens.includes(q)) {
-      matches += 1
-    }
-  }
-  return matches / fieldTokens.length
+  return listTokens(entity.fields['tags'])
 }
 
 /**
@@ -124,7 +69,7 @@ export interface RankedMatch {
   readonly score: number
 }
 
-export type { DoctrineSummary }
+export type { DoctrineSummary, DoctrineMatch, DoctrineRanking }
 
 export const RANKED_KINDS = ['ADR', 'FLOW', 'WORK', 'INC'] as const
 export type RankedKind = (typeof RANKED_KINDS)[number]
@@ -165,7 +110,7 @@ export interface AskReport {
   readonly openHazards: readonly Entity[]
   readonly ranked: Readonly<Record<RankedKind, readonly RankedMatch[]>>
   readonly totalMatches: number
-  readonly doctrine: readonly DoctrineSummary[]
+  readonly doctrine: DoctrineRanking
   readonly exclusions: AskExclusions
 }
 
@@ -173,6 +118,15 @@ export interface AskOptions {
   readonly limit?: number
   readonly doctrine?: readonly DoctrineSummary[]
 }
+
+/**
+ * Doctrine is capped tighter than entities, and deliberately.
+ *
+ * An entity match is a fact about this repository the agent may need; a doctrine match is a
+ * technique it may reach for, and a list of twelve techniques is a research project, not
+ * guidance. Three is what fits in the space between reading the query and starting work.
+ */
+export const DEFAULT_DOCTRINE_LIMIT = 3
 
 /**
  * A decision that has been replaced is not guidance, so it is not ranked.
@@ -254,7 +208,7 @@ export function askStore(
     openHazards,
     ranked,
     totalMatches,
-    doctrine: options.doctrine ?? [],
+    doctrine: rankDoctrine(queryTokens, options.doctrine ?? [], DEFAULT_DOCTRINE_LIMIT),
     exclusions: {
       searched,
       scoredZero: searched - totalMatches,

@@ -9,7 +9,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { ENTITY_KINDS, type EntityKind } from './model.js'
 import { parseEntity, buildStore, type Entity, type LoadProblem, type Store } from './store.js'
-import { parseFrontmatter, type ParseResult } from './frontmatter.js'
+import { parseFrontmatter, toList, type ParseResult } from './frontmatter.js'
+import { parseResidency, type DoctrineSummary } from './doctrine.js'
+import { byteLength } from './frontmatter.js'
 import type { AnchoringConfig } from './config.js'
 
 export function readFrontmatter(path: string): ParseResult {
@@ -76,11 +78,8 @@ export function loadStore(config: AnchoringConfig): Store {
   return buildStore(results)
 }
 
-export interface DoctrineSummary {
-  readonly path: string
-  readonly name: string
-  readonly title?: string
-}
+/** Declared in the pure layer; re-exported here so existing importers keep working. */
+export type { DoctrineSummary }
 
 function listMarkdownRecursive(dir: string): readonly string[] {
   let entries: readonly string[]
@@ -104,6 +103,38 @@ function listMarkdownRecursive(dir: string): readonly string[] {
   return result
 }
 
+/**
+ * Read one doctrine file's Tier 1: title, tags, and triggers.
+ *
+ * Three sources, in falling order of deliberateness. Frontmatter `title:` is a decision;
+ * the first `# ` heading is what every doctrine file written before frontmatter existed
+ * has; and a file with neither still returns, carrying its name. Nothing here reads the
+ * body, which is the whole point of a summary.
+ */
+function summariseDoctrine(text: string): {
+  readonly title?: string
+  readonly tags?: readonly string[]
+  readonly when?: readonly string[]
+  readonly residency: ReturnType<typeof parseResidency>
+} {
+  const parsed = parseFrontmatter(text)
+  const fm = parsed.ok ? parsed.data : {}
+
+  const heading = text.split(/\r?\n/).find((line) => line.startsWith('# '))
+  const fmTitle = typeof fm['title'] === 'string' ? fm['title'].trim() : ''
+  const title = fmTitle.length > 0 ? fmTitle : heading ? heading.slice(2).trim() : undefined
+
+  const tags = toList(fm['tags']).filter((t) => t.length > 0)
+  const when = toList(fm['when']).filter((t) => t.length > 0)
+
+  return {
+    ...(title ? { title } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
+    ...(when.length > 0 ? { when } : {}),
+    residency: parseResidency(fm['residency']),
+  }
+}
+
 export function loadDoctrine(config: AnchoringConfig): readonly DoctrineSummary[] {
   const doctrineDir = join(config.root, config.kbRoot, 'doctrine')
   const paths = listMarkdownRecursive(doctrineDir)
@@ -111,21 +142,29 @@ export function loadDoctrine(config: AnchoringConfig): readonly DoctrineSummary[
   for (const p of paths) {
     const rel = relative(config.root, p).split(sep).join('/')
     const relToDoctrine = relative(doctrineDir, p).split(sep).join('/')
-    let title: string | undefined
+    let summary: ReturnType<typeof summariseDoctrine> = { residency: 'brief' }
     try {
-      const text = readFileSync(p, 'utf8')
-      const firstHeading = text.split(/\r?\n/).find((line) => line.startsWith('# '))
-      if (firstHeading) {
-        title = firstHeading.slice(2).trim()
-      }
+      summary = summariseDoctrine(readFileSync(p, 'utf8'))
     } catch {
-      // ignore
+      // An unreadable doctrine file is still a doctrine file; it lists, it never ranks.
     }
-    summaries.push({
-      path: rel,
-      name: relToDoctrine,
-      ...(title ? { title } : {}),
-    })
+    summaries.push({ path: rel, name: relToDoctrine, ...summary })
   }
   return summaries.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * Doctrine summaries paired with what each file costs on disk.
+ *
+ * Separate from `loadDoctrine` because only the budget check needs the sizes, and `kb ask`
+ * runs on every question. Measured in UTF-8 bytes, which is what the file on disk and the
+ * request body are both counted in.
+ */
+export function loadDoctrineSizes(
+  config: AnchoringConfig,
+): readonly { readonly summary: DoctrineSummary; readonly bytes: number }[] {
+  return loadDoctrine(config).map((summary) => ({
+    summary,
+    bytes: byteLength(readText(join(config.root, summary.path)) ?? ''),
+  }))
 }

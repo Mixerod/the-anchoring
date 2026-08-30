@@ -86,6 +86,7 @@
         "name": "domain",
         "paths": [
           "src/config.ts",
+          "src/config-schema.ts",
           "src/config-architecture.ts",
           "src/store.ts",
           "src/verify-upstream.ts",
@@ -104,7 +105,9 @@
           "src/fingerprint.ts",
           "src/fnv.ts",
           "src/guards-live.ts",
-          "src/skills.ts"
+          "src/skills.ts",
+          "src/tokens.ts",
+          "src/doctrine.ts"
         ],
         "pure": true
       }
@@ -117,14 +120,12 @@
       "src/cli-upstream.ts": 70,
       "src/cli.ts": 174,
       "src/config-architecture.ts": 181,
-      "src/config.ts": 231,
-      "src/ctx.ts": 61,
+      "src/config.ts": 227,
       "src/guards.ts": 71,
       "src/init.ts": 214,
       "src/owners.ts": 55,
       "src/pack.ts": 62,
       "src/promote.ts": 66,
-      "src/render.ts": 52,
       "src/upstream.ts": 67,
       "src/verify-hazard.ts": 99,
       "src/verify-upstream.ts": 100

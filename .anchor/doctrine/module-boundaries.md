@@ -1,6 +1,17 @@
-<!-- the-anchoring:pack discipline@1.1.0 hash:9b77f590ef676b51 -->
+<!-- the-anchoring:pack discipline@1.3.0 hash:8cf19609995c9a57 -->
 <!-- Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
      hand-edited rather than overwrite it. -->
+
+---
+title: Module Boundaries
+tags: [architecture, layering, imports, coupling]
+when:
+  - a new module or package is being created
+  - a file has grown until changes feel unsafe
+  - one module reads another module data or internal files
+  - business logic is appearing in a controller or handler
+  - io or an sdk is being imported by the domain core
+---
 
 # Module Boundaries
 

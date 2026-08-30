@@ -157,7 +157,7 @@ describe('renderWhy', () => {
 })
 
 describe('renderCtx', () => {
-  const base = { query: 'W-112', sections: [], anchors: [] }
+  const base = { query: 'W-112', sections: [], anchors: [], doctrine: [] }
 
   test('tells the agent what to create when the work item does not exist', () => {
     const text = renderCtx({ ...base, query: 'W-404' }, PLAIN)

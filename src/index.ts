@@ -103,7 +103,7 @@ export { rememberWork, recallWork } from './session.js'
 export { verify, type VerifyReport, type Finding, type Severity } from './verify.js'
 export { checkHazard, checkHazardCeiling } from './verify-hazard.js'
 export { checkUpstream, checkUpstreamCeiling, isEscalated } from './verify-upstream.js'
-export { checkTags } from './verify.js'
+export { checkTags, checkResidentDoctrine } from './verify.js'
 
 // Ask (Free text front door - Layer 4 Part B)
 export {
@@ -113,6 +113,7 @@ export {
   tokenise,
   extractQueryTokens,
   DEFAULT_ASK_LIMIT,
+  DEFAULT_DOCTRINE_LIMIT,
   type AskReport,
   type AskOptions,
   type RankedMatch,
@@ -120,11 +121,26 @@ export {
   type DoctrineSummary,
 } from './ask.js'
 
+// Doctrine (technique knowledge, ranked by its `when:` triggers)
+export {
+  scoreDoctrine,
+  rankDoctrine,
+  DOCTRINE_WEIGHTS,
+  DOCTRINE_RESIDENCIES,
+  DEFAULT_RESIDENCY,
+  parseResidency,
+  residencyOf,
+  type DoctrineMatch,
+  type DoctrineRanking,
+  type DoctrineResidency,
+} from './doctrine.js'
+export { fieldOverlap, listTokens, STOPWORDS } from './tokens.js'
+
 // Why (Reverse walk)
 export { why, type WhyReport, type CodeMention, type EntityEdge } from './why.js'
 
 // Context (Tier 2 disclosure)
-export { ctx, type CtxReport, type CtxSection, type CtxEntry } from './ctx.js'
+export { ctx, workQuery, DOCTRINE_IN_CTX, type CtxReport, type CtxSection, type CtxEntry } from './ctx.js'
 
 // Done & Stop hook
 export {
@@ -183,6 +199,7 @@ export {
   targetPathForFile,
   planPack,
   checkPack,
+  isAdopted,
   type PackManifest,
   type PackFile,
   type Pack,

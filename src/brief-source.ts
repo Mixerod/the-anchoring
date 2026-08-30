@@ -9,7 +9,7 @@
 import { join } from 'node:path'
 import { loadStore, loadDoctrine, readText } from './loader.js'
 import type { AnchoringConfig } from './config.js'
-import type { BriefEntity, BriefFile, BriefInput } from './brief.js'
+import type { BriefDoctrine, BriefEntity, BriefFile, BriefInput } from './brief.js'
 
 const AGENTS_FILE = 'AGENTS.md'
 
@@ -33,11 +33,11 @@ export function readBriefInput(config: AnchoringConfig, session?: string): Brief
       ? undefined
       : { name: AGENTS_FILE, path: AGENTS_FILE, body: agentsBody }
 
-  const doctrine: BriefFile[] = []
+  const doctrine: BriefDoctrine[] = []
   for (const summary of loadDoctrine(config)) {
     const body = readOrUndefined(join(config.root, summary.path))
     if (body !== undefined) {
-      doctrine.push({ name: summary.name, path: summary.path, body })
+      doctrine.push({ name: summary.name, path: summary.path, body, summary })
     }
   }
 

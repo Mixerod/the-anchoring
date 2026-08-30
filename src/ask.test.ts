@@ -187,7 +187,8 @@ describe('ask retrieval', () => {
   test('includes doctrine files when present, and omits section when absent', () => {
     const withoutDoctrine = fixture(CORPUS)
     const report1 = ask(conf(withoutDoctrine), 'payment')
-    expect(report1.doctrine).toEqual([])
+    expect(report1.doctrine.matched).toEqual([])
+    expect(report1.doctrine.unmatched).toEqual([])
     const rendered1 = renderAsk(report1, PLAIN)
     expect(rendered1).not.toContain('Doctrine')
 
@@ -196,13 +197,15 @@ describe('ask retrieval', () => {
       '.anchor/doctrine/discipline/verification.md': '# Verification and honesty\n\nProse here.\n',
     })
     const report2 = ask(conf(withDoctrine), 'payment')
-    expect(report2.doctrine.length).toBe(1)
-    expect(report2.doctrine[0]?.name).toBe('discipline/verification.md')
-    expect(report2.doctrine[0]?.title).toBe('Verification and honesty')
+    // No frontmatter, and 'payment' matches nothing in it: listed, never ranked.
+    expect(report2.doctrine.matched).toEqual([])
+    expect(report2.doctrine.unmatched.length).toBe(1)
+    expect(report2.doctrine.unmatched[0]?.name).toBe('discipline/verification.md')
+    expect(report2.doctrine.unmatched[0]?.title).toBe('Verification and honesty')
 
     const rendered2 = renderAsk(report2, PLAIN)
     expect(rendered2).toContain('Doctrine')
-    expect(rendered2).toContain('discipline/verification.md - Verification and honesty')
+    expect(rendered2).toContain('discipline/verification.md')
   })
 })
 

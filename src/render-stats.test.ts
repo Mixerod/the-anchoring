@@ -19,7 +19,14 @@ const doc = (id: string, kind: EntityKind, status: string, body: string): BriefE
 
 const INPUT: BriefInput = {
   agents: { name: 'AGENTS.md', path: 'AGENTS.md', body: 'a'.repeat(100) },
-  doctrine: [{ name: 'solid.md', path: '.anchor/doctrine/solid.md', body: 'd'.repeat(200) }],
+  doctrine: [
+    {
+      name: 'solid.md',
+      path: '.anchor/doctrine/solid.md',
+      body: 'd'.repeat(200),
+      summary: { name: 'solid.md', path: '.anchor/doctrine/solid.md' },
+    },
+  ],
   entities: [
     doc('INV-A', 'INV', 'active', 'i'.repeat(300)),
     doc('ADR-0001', 'ADR', 'accepted', 'r'.repeat(400)),

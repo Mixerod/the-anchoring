@@ -1,5 +1,5 @@
 {
   "name": "discipline",
-  "version": "1.2.0",
-  "description": "Module boundaries, secret handling, and agent verification discipline."
+  "version": "1.3.0",
+  "description": "Module boundaries, secret handling, and agent verification discipline. Doctrine carries when: triggers, so kb ask and kb ctx can find it by the situation."
 }

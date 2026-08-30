@@ -5,7 +5,8 @@
  */
 
 import { loadConfig } from './root.js'
-import { planPack, checkPack, type PackCheckResult } from './pack.js'
+import { planPack, checkPack, isAdopted, type Pack, type PackCheckResult } from './pack.js'
+import type { AnchoringConfig } from './config.js'
 import { applyPack, defaultPackIo, findPack, resolvePacks } from './pack-source.js'
 
 function handleList(
@@ -99,6 +100,39 @@ function renderCheckResult(res: PackCheckResult, log: (s: string) => void): void
   }
 }
 
+/**
+ * Which packs `kb pack check` should look at, and which it is declining to.
+ *
+ * Naming an explicit pack checks it whether or not it was adopted — the user asked. With no
+ * name, only adopted packs are checked; the rest are returned so the caller can print them.
+ * See INC-0005.
+ */
+function selectPacksToCheck(
+  name: string | undefined,
+  config: AnchoringConfig,
+  io: { readonly readFile: (p: string) => string | undefined },
+):
+  | { readonly ok: true; readonly packs: readonly Pack[]; readonly notAdopted: readonly string[] }
+  | { readonly ok: false; readonly error: string } {
+  if (name) {
+    const found = findPack(name)
+    return found.ok
+      ? { ok: true, packs: [found.pack], notAdopted: [] }
+      : { ok: false, error: found.error }
+  }
+
+  const resolved = resolvePacks()
+  if (!resolved.ok) return { ok: false, error: resolved.error }
+
+  const packs: Pack[] = []
+  const notAdopted: string[] = []
+  for (const pack of resolved.packs) {
+    if (isAdopted(pack, config, (p) => io.readFile(p))) packs.push(pack)
+    else notAdopted.push(pack.manifest.name)
+  }
+  return { ok: true, packs, notAdopted: notAdopted.sort() }
+}
+
 function handleCheck(
   argv: readonly string[],
   root: string,
@@ -116,25 +150,16 @@ function handleCheck(
   const config = configResult.config
 
   const io = defaultPackIo(root)
-  const packsToCheck = []
+  const selected = selectPacksToCheck(name, config, io)
+  if (!selected.ok) {
+    err(`kb pack check: ${selected.error}`)
+    return 1
+  }
+  const packsToCheck = selected.packs
 
-  if (name) {
-    const found = findPack(name)
-    if (!found.ok) {
-      err(`kb pack check: ${found.error}`)
-      return 1
-    }
-    packsToCheck.push(found.pack)
-  } else {
-    const resolved = resolvePacks()
-    if (!resolved.ok) {
-      err(`kb pack check: ${resolved.error}`)
-      return 1
-    }
-    for (const pack of resolved.packs) {
-      const hasAny = pack.files.some((f) => io.readFile(f.basename) !== undefined || true)
-      if (hasAny) packsToCheck.push(pack)
-    }
+  if (selected.notAdopted.length > 0) {
+    // The negative path, named. A filter whose rejections are invisible cannot be audited.
+    log(`kb pack check: not adopted, so not checked: ${selected.notAdopted.join(', ')}`)
   }
 
   let hasDrift = false

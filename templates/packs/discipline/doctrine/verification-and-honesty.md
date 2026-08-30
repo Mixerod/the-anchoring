@@ -1,3 +1,13 @@
+---
+title: Verification and Honesty
+tags: [verification, reporting, testing, thresholds]
+when:
+  - work is about to be reported as complete
+  - a check failed and the threshold looks easier to change than the code
+  - a number in an acceptance criterion came out lower than stated
+  - code is being referenced by line number
+---
+
 # Verification and Honesty
 
 Engineering discipline for agentic development and automated verification.

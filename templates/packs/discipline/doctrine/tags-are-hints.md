@@ -1,3 +1,12 @@
+---
+title: Tags Are a Hint, Not a Claim
+tags: [tags, retrieval, metadata, evidence]
+when:
+  - metadata is about to be cited as evidence
+  - a vocabulary of tags or labels is being introduced
+  - hand-maintained metadata has no checker behind it
+---
+
 # Tags Are a Hint, Not a Claim
 
 An anchor and a tag look alike in the frontmatter and mean entirely different things.

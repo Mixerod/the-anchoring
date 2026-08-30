@@ -9,14 +9,17 @@
 
 import { LINK_FIELDS, kindOf } from './model.js'
 import { type Entity, type Store } from './store.js'
-import { loadStore } from './loader.js'
+import { loadStore, loadDoctrineSizes } from './loader.js'
 import { type Resolver } from './anchors.js'
 import { createResolver } from './resolver.js'
 import type { AnchoringConfig } from './config.js'
 import { checkHazard, checkHazardCeiling } from './verify-hazard.js'
 import { checkUpstream, checkUpstreamCeiling } from './verify-upstream.js'
 import { checkTags, checkTagVocabulary } from './verify-tags.js'
+import { byteLength } from './frontmatter.js'
 import type { Finding, Severity } from './finding.js'
+import { residencyOf, type DoctrineSummary } from './doctrine.js'
+import { byCodepoint, doctrineIndexEntry } from './brief.js'
 
 export type { Finding, Severity }
 export { checkUpstream, checkHazard, checkTags, checkTagVocabulary }
@@ -185,6 +188,62 @@ export function checkBodyBudget(entity: Entity, maxBodyBytes: number): readonly 
   ]
 }
 
+/**
+ * The tier-1 doctrine budget: what every agent pays on every cold start.
+ *
+ * Two things land in tier 1 and both are counted, because both are paid:
+ * a `brief` file contributes its whole body, and an `index` file contributes its index entry.
+ * The first version of this check counted only bodies, which made it silent on a corpus of
+ * twenty correctly-indexed files costing 15 KB of entries — silence on precisely the case it
+ * was built for, which is the failure this repository names as worse than no check at all.
+ *
+ * `residency: brief` is the default, which is right for backward compatibility and is why the
+ * body half must exist: a pack that seeds fifteen technique files and forgets the field makes
+ * every agent read all fifteen on every call, and nothing else in this tool would say so.
+ *
+ * Advisory, and never an error under any flag. A verbose corpus is not a broken one (rule 8).
+ * The hint differs by cause, because "add `residency: index`" is useless advice to someone
+ * whose corpus is already entirely indexed.
+ */
+export function checkResidentDoctrine(
+  docs: readonly { readonly summary: DoctrineSummary; readonly bytes: number }[],
+  maxResidentDoctrineBytes: number,
+): readonly Finding[] {
+  const costed = docs.map((d) => {
+    const indexed = residencyOf(d.summary) === 'index'
+    return {
+      name: d.summary.name,
+      indexed,
+      cost: indexed ? byteLength(doctrineIndexEntry(d.summary)) : d.bytes,
+    }
+  })
+
+  const total = costed.reduce((sum, d) => sum + d.cost, 0)
+  if (total <= maxResidentDoctrineBytes) return []
+
+  const residentBytes = costed.filter((d) => !d.indexed).reduce((sum, d) => sum + d.cost, 0)
+  const heaviest = [...costed]
+    .sort((a, b) => (b.cost !== a.cost ? b.cost - a.cost : byCodepoint(a.name, b.name)))
+    .slice(0, 3)
+    .map((d) => `${d.name} (${d.cost}b${d.indexed ? ', indexed' : ''})`)
+    .join(', ')
+
+  const hint =
+    residentBytes > maxResidentDoctrineBytes / 2
+      ? 'most of this is whole bodies; add `residency: index` to the files a task rarely needs, so `kb ask` names them instead'
+      : 'this corpus is already indexed, so the cost is the entries themselves; trim `when:` lists, or split the corpus across repositories'
+
+  return [
+    {
+      severity: 'warn',
+      advisory: true,
+      where: `${docs.length} doctrine file(s) · brief tier 1`,
+      message: `${total} bytes in tier 1 (${residentBytes} of it whole bodies), ${total - maxResidentDoctrineBytes} over the ${maxResidentDoctrineBytes}-byte budget; heaviest: ${heaviest}`,
+      hint: `every agent reads tier 1 on every cold start; ${hint}`,
+    },
+  ]
+}
+
 export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyReport {
   const store = loadStore(config)
   const resolver = createResolver(config)
@@ -194,6 +253,8 @@ export function verify(config: AnchoringConfig, now: Date = new Date()): VerifyR
     where: p.path,
     message: p.message,
   }))
+
+  findings.push(...checkResidentDoctrine(loadDoctrineSizes(config), config.maxResidentDoctrineBytes))
 
   let anchorCount = 0
   for (const entity of store.byId.values()) {

@@ -1,3 +1,14 @@
+---
+title: Module Boundaries
+tags: [architecture, layering, imports, coupling]
+when:
+  - a new module or package is being created
+  - a file has grown until changes feel unsafe
+  - one module reads another module data or internal files
+  - business logic is appearing in a controller or handler
+  - io or an sdk is being imported by the domain core
+---
+
 # Module Boundaries
 
 Structure between modules and long-term maintainability.

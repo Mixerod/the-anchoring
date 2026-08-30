@@ -1,0 +1,5 @@
+{
+  "name": "systems-async",
+  "version": "1.0.0",
+  "description": "Message queues, delivery semantics, idempotency, sagas, event sourcing and CQRS. Indexed doctrine: kb ask names a technique when the situation matches."
+}

@@ -28,134 +28,30 @@ export {
   DEFAULT_IO_MESSAGE,
 }
 
-/**
- * Optional closed vocabulary for `tags:`.
- *
- * Declared here rather than beside its checker because `AnchoringConfig` must not import a
- * checker: `verify-tags.ts` reads the store, the store reads the config, and a type import
- * the other way closes the loop. `depcruise` caught it, which is the whole reason the
- * no-circular rule exists.
- */
-export interface TagsConfig {
-  readonly vocabulary?: readonly string[]
-}
+import type { TagsConfig, KindSpec, AnchoringConfig } from './config-schema.js'
+export type { TagsConfig, KindSpec, AnchoringConfig }
+import {
+  DEFAULT_KB_ROOT,
+  DEFAULT_KINDS,
+  DEFAULT_GOVERNED_PATHS,
+  DEFAULT_HAZARD,
+  DEFAULT_SYMBOL_INDEX,
+  DEFAULT_MAX_BODY_BYTES,
+  DEFAULT_MAX_RESIDENT_DOCTRINE_BYTES,
+  defaultKinds,
+} from './config-schema.js'
 
-export interface KindSpec {
-  readonly dir: string                      // repo-relative, forward slashes
-  readonly idPattern: RegExp
-  readonly statuses: readonly string[]
-}
-
-export interface AnchoringConfig {
-  readonly root: string                     // absolute repository root
-  readonly kbRoot: string                   // repo-relative
-  readonly kinds: Readonly<Record<EntityKind, KindSpec>>
-  readonly governedPaths: readonly string[]
-  readonly hazard: { readonly openDays: number; readonly ceiling: number }
-  readonly symbolIndex: 'codegraph' | 'none'
-  /** Warn above this many UTF-8 bytes of entity body. Never an error — see checkBodyBudget. */
-  readonly maxBodyBytes: number
-  /**
-   * Optional closed vocabulary for `tags:`. Absent means the singleton default applies.
-   * See verify-tags.ts for why the two modes differ in severity.
-   */
-  readonly tags?: TagsConfig
-  readonly sessionFile: string              // derived: `${kbRoot}/session/current`
-  readonly architecture?: Architecture
-}
-
-export const DEFAULT_KB_ROOT = '.anchor'
-
-export const DEFAULT_KINDS: Readonly<
-  Record<
-    EntityKind,
-    {
-      readonly dir: (kbRoot: string) => string
-      readonly idPattern: RegExp
-      readonly statuses: readonly string[]
-    }
-  >
-> = {
-  ADR: {
-    dir: () => 'docs/adr',
-    idPattern: /^ADR-\d{4}$/,
-    statuses: ['proposed', 'accepted', 'superseded', 'void'],
-  },
-  INV: {
-    dir: (kbRoot) => `${kbRoot}/invariant`,
-    idPattern: /^INV-[A-Z0-9-]+$/,
-    statuses: ['active', 'retired'],
-  },
-  FLOW: {
-    dir: (kbRoot) => `${kbRoot}/flow`,
-    idPattern: /^FLOW-\d{4}$/,
-    statuses: ['draft', 'live', 'retired'],
-  },
-  WORK: {
-    dir: (kbRoot) => `${kbRoot}/work`,
-    idPattern: /^W-\d+$/,
-    statuses: ['todo', 'doing', 'review', 'done', 'dropped'],
-  },
-  INC: {
-    dir: (kbRoot) => `${kbRoot}/incident`,
-    idPattern: /^INC-\d{4}$/,
-    statuses: ['open', 'fixed', 'wontfix'],
-  },
-  HAZ: {
-    dir: (kbRoot) => `${kbRoot}/hazard`,
-    idPattern: /^HAZ-\d{4}$/,
-    statuses: ['active', 'retired'],
-  },
-}
-
-export const DEFAULT_GOVERNED_PATHS: readonly string[] = [
-  'src/',
-  'packages/',
-  'apps/',
-  'lib/',
-  'scripts/',
-]
-
-export const DEFAULT_HAZARD = {
-  openDays: 30,
-  ceiling: 24,
-}
-
-export const DEFAULT_SYMBOL_INDEX: 'codegraph' | 'none' = 'codegraph'
-
-/**
- * Entity bodies are the bulk of the corpus and nothing else bounds them. `src/` has
- * `maxFileLines`; a doctrine file may grow to any size, and every agent pays for it on every
- * cold start, forever.
- */
-export const DEFAULT_MAX_BODY_BYTES = 6000
-
-function defaultKinds(kbRoot: string): Record<EntityKind, KindSpec> {
-  const kinds = {} as Record<EntityKind, KindSpec>
-  for (const k of ENTITY_KINDS) {
-    const spec = DEFAULT_KINDS[k]
-    kinds[k] = {
-      dir: spec.dir(kbRoot),
-      idPattern: spec.idPattern,
-      statuses: spec.statuses,
-    }
-  }
-  return kinds
-}
-
-export function defaultConfig(root: string): AnchoringConfig {
-  const kbRoot = DEFAULT_KB_ROOT
-  return {
-    root,
-    kbRoot,
-    kinds: defaultKinds(kbRoot),
-    governedPaths: DEFAULT_GOVERNED_PATHS,
-    hazard: DEFAULT_HAZARD,
-    symbolIndex: DEFAULT_SYMBOL_INDEX,
-    maxBodyBytes: DEFAULT_MAX_BODY_BYTES,
-    sessionFile: `${kbRoot}/session/current`,
-  }
-}
+export {
+  DEFAULT_KB_ROOT,
+  DEFAULT_KINDS,
+  DEFAULT_GOVERNED_PATHS,
+  DEFAULT_HAZARD,
+  DEFAULT_SYMBOL_INDEX,
+  DEFAULT_MAX_BODY_BYTES,
+  DEFAULT_MAX_RESIDENT_DOCTRINE_BYTES,
+  defaultKinds,
+  defaultConfig,
+} from './config-schema.js'
 
 const KNOWN_TOP_KEYS = [
   'kbRoot',
@@ -164,6 +60,7 @@ const KNOWN_TOP_KEYS = [
   'hazard',
   'symbolIndex',
   'maxBodyBytes',
+  'maxResidentDoctrineBytes',
   'tags',
   'architecture',
 ] as const
@@ -210,6 +107,28 @@ function parseTags(raw: unknown, problems: string[]): TagsConfig | undefined {
   }
 
   return { vocabulary: vocabulary as readonly string[] }
+}
+
+/**
+ * One byte-budget parser for both budgets.
+ *
+ * Written when the second budget arrived and the first one's twelve lines were about to be
+ * copied. Two hand-written validators for one rule is two places for the rule to drift, and
+ * the second copy is always the one that forgets a case.
+ */
+function positiveInteger(
+  rawObj: Record<string, unknown>,
+  key: string,
+  fallback: number,
+  problems: string[],
+): number {
+  const raw = rawObj[key]
+  if (raw === undefined) return fallback
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw <= 0) {
+    problems.push(`\`${key}\` must be a positive integer`)
+    return fallback
+  }
+  return raw
 }
 
 export function parseConfig(root: string, raw: unknown): ConfigResult {
@@ -410,18 +329,14 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
     }
   }
 
-  let maxBodyBytes = DEFAULT_MAX_BODY_BYTES
-  if (rawObj['maxBodyBytes'] !== undefined) {
-    if (
-      typeof rawObj['maxBodyBytes'] !== 'number' ||
-      !Number.isInteger(rawObj['maxBodyBytes']) ||
-      rawObj['maxBodyBytes'] <= 0
-    ) {
-      problems.push('`maxBodyBytes` must be a positive integer')
-    } else {
-      maxBodyBytes = rawObj['maxBodyBytes']
-    }
-  }
+  const maxBodyBytes = positiveInteger(rawObj, 'maxBodyBytes', DEFAULT_MAX_BODY_BYTES, problems)
+
+  const maxResidentDoctrineBytes = positiveInteger(
+    rawObj,
+    'maxResidentDoctrineBytes',
+    DEFAULT_MAX_RESIDENT_DOCTRINE_BYTES,
+    problems,
+  )
 
   let tags: TagsConfig | undefined
   if (rawObj['tags'] !== undefined) {
@@ -461,6 +376,7 @@ export function parseConfig(root: string, raw: unknown): ConfigResult {
       kinds,
       governedPaths,
       hazard,
+      maxResidentDoctrineBytes,
       symbolIndex,
       maxBodyBytes,
       ...(tags !== undefined ? { tags } : {}),

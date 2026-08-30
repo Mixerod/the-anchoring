@@ -26,6 +26,7 @@
 
 import { ENTITY_KINDS, type EntityKind } from './model.js'
 import type { Entity } from './store.js'
+import { residencyOf, type DoctrineSummary } from './doctrine.js'
 
 export type TierLevel = 1 | 2 | 3 | 4
 
@@ -84,9 +85,14 @@ export interface BriefEntity {
   readonly body: string
 }
 
+/** A doctrine file and what is known about it without reading the body. */
+export interface BriefDoctrine extends BriefFile {
+  readonly summary: DoctrineSummary
+}
+
 export interface BriefInput {
   readonly agents?: BriefFile
-  readonly doctrine: readonly BriefFile[]
+  readonly doctrine: readonly BriefDoctrine[]
   readonly entities: readonly BriefEntity[]
   readonly session?: string
 }
@@ -144,6 +150,33 @@ function fileDocument(file: BriefFile): BriefDocument {
   return { id: file.name, path: file.path, body: normaliseBody(file.body) }
 }
 
+/**
+ * What an `index` doctrine file contributes to tier 1 instead of its body.
+ *
+ * Title, path, and triggers — the Tier-1 promise stated everywhere else in this repository:
+ * enough to decide whether to read the file, and not one byte more. The triggers are the
+ * whole of the decision, which is why they are here and the prose is not.
+ *
+ * Deterministic and free of counts, dates, and sizes, like everything else above tier 4. A
+ * moving byte here would invalidate the prompt cache from tier 1 down on every commit.
+ */
+export function doctrineIndexEntry(summary: DoctrineSummary): string {
+  const lines = [`# ${summary.title ?? summary.name}`, '', `path: ${summary.path}`]
+  const when = summary.when ?? []
+  if (when.length > 0) {
+    lines.push('when:')
+    for (const trigger of when) lines.push(`  - ${trigger}`)
+  }
+  lines.push('', 'Indexed, not resident. Read the file when a trigger above matches the task.')
+  return lines.join('\n')
+}
+
+function doctrineDocument(file: BriefDoctrine): BriefDocument {
+  return residencyOf(file.summary) === 'index'
+    ? { id: file.name, path: file.path, body: doctrineIndexEntry(file.summary) }
+    : fileDocument(file)
+}
+
 function entityDocuments(
   entities: readonly BriefEntity[],
   selectors: readonly KindSelector[],
@@ -173,7 +206,7 @@ export function planBrief(input: BriefInput): Brief {
     ...(input.agents ? [fileDocument(input.agents)] : []),
     ...[...input.doctrine]
       .sort((a, b) => byCodepoint(a.name, b.name))
-      .map(fileDocument),
+      .map(doctrineDocument),
   ]
 
   const tiers: readonly BriefTier[] = [

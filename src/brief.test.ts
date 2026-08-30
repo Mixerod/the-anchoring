@@ -46,8 +46,18 @@ const CORPUS: readonly BriefEntity[] = [
 const INPUT: BriefInput = {
   agents: { name: 'AGENTS.md', path: 'AGENTS.md', body: 'agent instructions' },
   doctrine: [
-    { name: 'solid.md', path: '.anchor/doctrine/solid.md', body: 'solid doctrine' },
-    { name: 'gates.md', path: '.anchor/doctrine/gates.md', body: 'gates doctrine' },
+    {
+      name: 'solid.md',
+      path: '.anchor/doctrine/solid.md',
+      body: 'solid doctrine',
+      summary: { name: 'solid.md', path: '.anchor/doctrine/solid.md' },
+    },
+    {
+      name: 'gates.md',
+      path: '.anchor/doctrine/gates.md',
+      body: 'gates doctrine',
+      summary: { name: 'gates.md', path: '.anchor/doctrine/gates.md' },
+    },
   ],
   entities: CORPUS,
   session: 'W-2',

@@ -1,4 +1,4 @@
-<!-- the-anchoring:pack discipline@1.0.0 hash:239a55e2dc0a9006 -->
+<!-- the-anchoring:pack discipline@1.3.0 hash:239a55e2dc0a9006 -->
 <!-- Seeded by `kb pack add discipline`. Edit freely — `kb pack check` will report it as
      hand-edited rather than overwrite it. -->
 
@@ -8,10 +8,7 @@ title: No structured credential literals in tracked files
 status: active
 enforced_by:
   - file:scripts/anchoring-scan-secrets.mjs
-holds_for:
-  - file:src/
-  - file:scripts/
-  - file:package.json
+holds_for: []
 ---
 
 # INV-SECRETS-NO-LITERALS: No structured credential literals in tracked files
